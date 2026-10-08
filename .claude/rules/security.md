@@ -21,7 +21,7 @@ Stack, auth model, data store, and PII posture come from `ARCHITECTURE.md`. Secu
 
 ### Rule integrity
 - Rule changes go to `main` only through reviewed PRs. Enable branch protection (PR + review required, no force-push) before rules land.
-- A decision without a rule version and rule-set hash is invalid, and tests assert that both are present.
+- Every decision records the registry hash, and every determined decision records its rule-set version and hash. The `Decision` model rejects anything less.
 
 ### No PII by design
 - Fact schemas have no fields for names, SSNs/TINs, account numbers, addresses, or DOB. Parties are identified by role (for example, `surviving_spouse`, `child_1`).

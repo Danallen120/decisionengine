@@ -23,7 +23,7 @@ Anything outside the paths below is **not determinable** and goes to a person. *
 | Existing administration | **Any** pending or granted application for a personal representative, **in any jurisdiction**, bars the affidavit. There is no consent route. | Allowed with the personal representative's written consent |
 | Extra conditions | The decedent was a WA resident; all debts are paid or provided for; written notice went to all other successors **at least 10 days** before | None comparable |
 | Joint accounts | With **or without** right of survivorship (RCW 30A.22.050) | Survivorship presumed (Prob. Code § 5302(a)) |
-| A will overriding a POD designation | **Possible** under RCW 11.11.020 (see W3) | Not possible (§ 5302(e)) |
+| A will overriding a POD designation | **Possible** for WA residents under RCW 11.11.020; bank POD and survivorship accounts are nonprobate assets (RCW 11.02.005(14)). The institution is protected until it receives an RCW 11.11.050 notice (see W3). | Not possible (§ 5302(e)) |
 
 ## Path A: accounts with surviving depositors or POD/trust beneficiaries
 
@@ -69,7 +69,7 @@ Applies to funds that belong to the estate: a single account, the decedent's sha
 | Who is paid | The claiming successor who presents the affidavit and proof of death. The claimant must be either personally entitled to full payment, or entitled on behalf of, and with the written authority of, all other successors who have an interest. | RCW 11.62.010(1), (2)(i) |
 | Shares | The institution pays "so much ... as is claimed". A claimant acting with every other successor's written authority may take the full balance (W5). | RCW 11.62.010(1), (2)(g), (i) |
 | Documents | 1. The affidavit with every RCW 11.62.010(2) statement. 2. Proof of death. No tax release may be required. | RCW 11.62.010(1), (2), (4) |
-| Earliest payment | The **later** of: 40 days after death, or 10 days after notice was served or mailed to the other successors (W4). | RCW 11.62.010(1), (2)(d), (h) |
+| Earliest payment | The **later** of: 40 days after death, or 10 days after notice was served or mailed to the other successors. Days are counted under RCW 1.12.040 (exclude the first day, include the last); whether payment may happen on day 40 or day 41, and whether weekends and holidays extend the wait, is W4. | RCW 11.62.010(1), (2)(d), (h); RCW 1.12.040 |
 | Liability protection | **Yes.** The institution is discharged as if it had dealt with a personal representative, **unless** it had actual knowledge that a required statement was false. An organization has that knowledge only once it reaches the individual making the payment. If several affidavits arrive, it may pay the first one received with proof of death, or interplead. | RCW 11.62.020 |
 
 **Also required by statute:** a copy of the affidavit, including the decedent's Social Security number, must be mailed to DSHS's Office of Financial Recovery. The statute doesn't say who mails it (W6). The engine never handles the SSN; at most this becomes a process step or document.
@@ -88,6 +88,7 @@ Applies to funds that belong to the estate: a single account, the decedent's sha
 | **Community property agreement** | Pay all funds in the deceased spouse's name to the surviving spouse, on a certified copy of the recorded agreement plus the spouse's affidavit that it was valid and in force at death. | Under owner review (W7; analysis in open-questions) |
 | **Balance at or below $2,500** | Payment may go to the surviving spouse, next of kin, funeral director, or a creditor who "may appear to be entitled", on proof of death and an affidavit that no personal representative was appointed. The institution may require waivers, indemnity and other proofs (Policy). | Under owner review (W8; analysis in open-questions) |
 | **Foreign personal representative** | After 60 days, with the documents listed in RCW 30A.22.200. | Out of scope for v1 |
+| **Credit union, balance at or below $1,000** | A credit union may pay the surviving spouse or domestic partner on their affidavit that no executor or administrator was appointed. A good-faith payment is a full release, and the spouse must account to a later personal representative. | Under owner review (W11) |
 
 ## Intestate shares (reference only)
 

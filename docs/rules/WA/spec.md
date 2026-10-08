@@ -96,16 +96,15 @@ RCW 11.04.015 sets intestate shares. The surviving spouse or domestic partner ta
 
 ## Facts the engine will need
 
-**In the schema today:** account type and holders with survivorship and terms shares; balance; multiple-signature requirement; restraining order and withdrawal notice; former-spouse and former-partner relationships; administration status; declared value; affiants.
+**In the schema** (REQ-CORE-004, -005, -006):
+- `account.account_type`: `sole`, `joint_with_survivorship`, `joint_without_survivorship` (which may also name POD payees), `payable_on_death`, `totten_trust`; holders with survivorship and terms shares.
+- `account.dispute_notice_received` (RCW 30A.22.120, .210) and `account.testamentary_disposition_notice_received` (RCW 11.11.040, .050); restraining order and withdrawal notice; multiple-signature terms.
+- `decedent_resident_of_jurisdiction` (RCW 11.62.010(2)(b)).
+- `estate.administration` (in Washington) and `estate.representative_application_elsewhere` (any other jurisdiction); together these cover RCW 11.62.010(2)(e).
+- `estate.declared_value` (as RCW 11.62.010(2)(c) defines it), `estate.successor_notice_given_on` (10-day wait), `estate.claim_authorized_by_all_successors` (RCW 11.62.010(2)(i)), and `estate.affiants`.
+- Former-spouse and former-partner relationships (RCW 11.07.010).
 
-**Schema changes Washington needs** (for owner approval):
-1. Distinguish **joint with** and **without** right of survivorship.
-2. **Residency:** whether the decedent was a resident of the jurisdiction (yes / no / unknown).
-3. **Administration anywhere:** Washington bars the affidavit if any jurisdiction has a pending or granted application, while California looks only at California proceedings.
-4. **Date notice was given to the other successors** (for the 10-day wait).
-5. **Notices received:** written notice of a dispute (RCW 30A.22.210), and notice of testamentary disposition (RCW 11.11.050).
-6. **Claim scope:** whether the claimant claims the full balance with written authority from all other successors.
-7. **Community property agreement:** whether a recorded agreement and the surviving spouse's affidavit were presented (if W7 is approved).
+**Waiting on owner decisions:** community property agreement documents (W7); `funeral_director` and `creditor` relationships plus claimant priority in policy (W8); institution type in policy (W11).
 
 ## Draft golden scenarios
 

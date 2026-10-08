@@ -86,15 +86,20 @@ Sections 6401 and 6402 set intestate shares: community property to the spouse, a
 
 ## Facts the engine will need
 
-The current `Facts` schema has no field for these, and adding them is a schema change for owner approval:
+**Already in the schema** (REQ-CORE-004):
+- Account type: sole, joint, POD, Totten trust.
+- Holders by role (co-owner, POD payee, Totten beneficiary), with survivorship and any terms shares.
+- Whether the terms require multiple signatures.
+- Whether a restraining order or a written withdrawal notice has been received.
+- Former-spouse and former-domestic-partner relationships (§ 5040).
 
-- Account type: sole, joint with survivorship, POD, Totten trust. Also whether the account requires multiple signatures, and whether a § 5405(c) notice or a restraining order has been received.
-- Surviving joint parties, POD payees, and Totten beneficiaries (by party ID), plus any shares set by the account terms.
-- Whether a POD payee or Totten beneficiary is a former spouse or former registered domestic partner.
+**Still needed for Path B** (a schema change for owner approval):
 - The declared gross value of California property, excluding § 13050 property, as stated in the affidavit.
 - Whether the estate includes California real property.
-- Administration status: none / proceeding exists with personal-representative consent / proceeding exists without consent.
+- Administration status: none / proceeding exists with personal-representative consent / proceeding exists without consent. This replaces today's yes/no `probate_opened`.
 - Affiants (by party ID) and the capacity each signs in (successor, or a § 13051 representative).
+
+**Institution policy, not facts** (REQ-POLICY-001): extra waiting days, extra documents, and declined account types or balances.
 
 ## Draft golden scenarios
 
@@ -117,4 +122,4 @@ These become `golden/ca.yaml` after attorney review. Dates assume Q3 is resolved
 | GS-CA-013 | As 001, but died 2022-04-01 with estate $184,500.00 | Eligible: first day of coverage, at the 2022 limit. |
 | GS-CA-014 | Totten trust; trustee was the sole trustee; two surviving beneficiaries; no share terms | Pay each 1/2. Document: proof of death showing both beneficiaries survived the trustee. Payable on request. Protected (§ 5405). |
 | GS-CA-015 | Totten trust; account terms give beneficiaries 70% / 30% | Pay 7/10 and 3/10 per the account terms (§ 5302(c)(2)(B)). |
-| GS-CA-016 | Joint with survivorship; two surviving parties | Payable to either or both per the account terms (§§ 5401(a), 5402). Protected (§ 5405). Needs a "joint payee" decision form (see open questions). |
+| GS-CA-016 | Joint with survivorship; two surviving parties | Payable to any of the survivors per the account terms (§§ 5401(a), 5402). Protected (§ 5405). Uses the `any_of` payment form. |

@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 from decision_engine.core.types import Money, Share
 
-FACTS_SCHEMA_VERSION: Final = "2"
+FACTS_SCHEMA_VERSION: Final = "3"
 MAX_PARTIES: Final = 50
 MAX_ACCOUNT_HOLDERS: Final = 20
 
@@ -90,6 +90,30 @@ class Relationship(StrEnum):
     NAMED_BENEFICIARY = "named_beneficiary"
     FORMER_SPOUSE = "former_spouse"
     FORMER_DOMESTIC_PARTNER = "former_domestic_partner"
+    TRUST = "trust"
+    """A trust that takes as a beneficiary. It acts only through a trustee affiant."""
+    REPRESENTATIVE = "representative"
+    """Acts for another party (e.g. a guardian or attorney-in-fact); no claim of its own."""
+
+
+class AdministrationStatus(StrEnum):
+    """Whether a proceeding to administer the estate exists in the jurisdiction."""
+
+    NONE = "none"
+    OPENED_WITH_REPRESENTATIVE_CONSENT = "opened_with_representative_consent"
+    """A proceeding exists, and the personal representative consented in writing."""
+    OPENED_WITHOUT_CONSENT = "opened_without_consent"
+
+
+class AffiantCapacity(StrEnum):
+    """The capacity in which someone signs a small-estate affidavit (provisional vocabulary)."""
+
+    SUCCESSOR = "successor"
+    GUARDIAN_OR_CONSERVATOR = "guardian_or_conservator"
+    TRUSTEE = "trustee"
+    CUSTODIAN_FOR_MINOR = "custodian_for_minor"
+    OTHER_STATE_PERSONAL_REPRESENTATIVE = "other_state_personal_representative"
+    ATTORNEY_IN_FACT = "attorney_in_fact"
 
 
 class AccountType(StrEnum):
@@ -166,6 +190,12 @@ class Account(_StrictModel):
     withdrawal_notice_received: bool = Field(
         description="A party's written notice restricting withdrawals has been received.",
     )
+    ownership_instrument_issued: bool = Field(
+        description=(
+            "The institution issued an ownership instrument (e.g. a passbook or certificate) "
+            "that it could require to be presented before paying."
+        ),
+    )
 
     @model_validator(mode="after")
     def _check_terms(self) -> Self:
@@ -211,15 +241,40 @@ def _check_terms_shares(holders: tuple[AccountHolder, ...]) -> None:
         raise ValueError(msg)
 
 
+class Affiant(_StrictModel):
+    """Someone who signs a small-estate affidavit, and for whom."""
+
+    party_id: PartyId
+    capacity: AffiantCapacity
+    on_behalf_of: PartyId | None = Field(
+        default=None,
+        description="The successor a representative signs for. Empty when signing as successor.",
+    )
+
+
+class Estate(_StrictModel):
+    """Estate-level facts, as declared in the affidavit. Unknown values are null, never guessed."""
+
+    administration: AdministrationStatus
+    declared_value: Money | None = Field(
+        description=(
+            "Gross value of the decedent's property in the jurisdiction, excluding property the "
+            "statute excludes, as declared by the affiants."
+        ),
+    )
+    has_real_property_in_jurisdiction: bool | None
+    affiants: tuple[Affiant, ...] = Field(default=(), max_length=MAX_PARTIES)
+
+
 class Facts(_StrictModel):
     """Everything the engine may consider for one account."""
 
-    schema_version: Literal["2"] = FACTS_SCHEMA_VERSION
+    schema_version: Literal["3"] = FACTS_SCHEMA_VERSION
     jurisdiction: Jurisdiction
     date_of_death: date
     as_of_date: date = Field(description="Date the decision is evaluated for. Never the clock.")
     account: Account
-    probate_opened: bool
+    estate: Estate
     parties: tuple[Party, ...] = Field(max_length=MAX_PARTIES)
 
     @model_validator(mode="after")
@@ -235,4 +290,36 @@ class Facts(_StrictModel):
         if unknown:
             msg = f"account holders must be listed in parties: {sorted(unknown)}"
             raise ValueError(msg)
+        _check_affiants(self.estate.affiants, {p.party_id: p.relationship for p in self.parties})
         return self
+
+
+def _check_affiants(affiants: tuple[Affiant, ...], parties: dict[str, Relationship]) -> None:
+    signer_ids = [affiant.party_id for affiant in affiants]
+    if len(signer_ids) != len(set(signer_ids)):
+        msg = "each party may sign the affidavit only once"
+        raise ValueError(msg)
+    for affiant in affiants:
+        _check_affiant(affiant, parties)
+
+
+def _check_affiant(affiant: Affiant, parties: dict[str, Relationship]) -> None:
+    relationship = parties.get(affiant.party_id)
+    if relationship is None:
+        msg = f"affiant {affiant.party_id} must be listed in parties"
+        raise ValueError(msg)
+    if relationship is Relationship.TRUST:
+        msg = "a trust signs only through a trustee affiant"
+        raise ValueError(msg)
+    is_successor = affiant.capacity is AffiantCapacity.SUCCESSOR
+    if is_successor and relationship is Relationship.REPRESENTATIVE:
+        msg = "a representative party must sign in a representative capacity"
+        raise ValueError(msg)
+    if is_successor != (affiant.on_behalf_of is None):
+        msg = "on_behalf_of is required for a representative and not allowed for a successor"
+        raise ValueError(msg)
+    if affiant.on_behalf_of is not None and (
+        affiant.on_behalf_of == affiant.party_id or affiant.on_behalf_of not in parties
+    ):
+        msg = "a representative must act for another listed party"
+        raise ValueError(msg)

@@ -25,9 +25,9 @@ def _parse(payload):
 
 def test_valid_facts_parse_and_are_frozen():
     facts = make_facts()
-    assert facts.schema_version == "2"
+    assert facts.schema_version == "3"
     with pytest.raises(ValidationError):
-        facts.probate_opened = True  # type: ignore[misc]
+        facts.as_of_date = facts.date_of_death  # type: ignore[misc]
 
 
 @pytest.mark.parametrize("field", ["name", "ssn", "account_number", "address", "notes"])
@@ -52,7 +52,7 @@ def test_money_must_be_a_two_place_decimal_string(balance):
 @pytest.mark.parametrize("value", ["true", 1, "yes"])
 def test_booleans_are_not_coerced(value):
     with pytest.raises(ValidationError):
-        _parse(facts_payload(probate_opened=value))
+        _parse(facts_payload(account=account_payload(ownership_instrument_issued=value)))
 
 
 def test_as_of_date_before_death_is_rejected():

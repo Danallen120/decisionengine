@@ -34,6 +34,18 @@ def account_payload(**overrides: Any) -> dict[str, Any]:
         "requires_multiple_signatures": False,
         "restraining_order_served": False,
         "withdrawal_notice_received": False,
+        "ownership_instrument_issued": False,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def estate_payload(**overrides: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "administration": "none",
+        "declared_value": "150000.00",
+        "has_real_property_in_jurisdiction": False,
+        "affiants": [{"party_id": "P2", "capacity": "successor"}],
     }
     payload.update(overrides)
     return payload
@@ -45,7 +57,7 @@ def facts_payload(**overrides: Any) -> dict[str, Any]:
         "date_of_death": "2026-01-15",
         "as_of_date": "2026-03-01",
         "account": account_payload(),
-        "probate_opened": False,
+        "estate": estate_payload(),
         "parties": [
             {"party_id": "P1", "relationship": "surviving_spouse"},
             {"party_id": "P2", "relationship": "child"},

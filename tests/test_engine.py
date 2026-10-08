@@ -13,6 +13,7 @@ from hypothesis import strategies as st
 
 from decision_engine.core import (
     AccountType,
+    AdministrationStatus,
     Decision,
     Facts,
     Jurisdiction,
@@ -25,7 +26,7 @@ from decision_engine.core import (
     evaluate,
 )
 
-from .conftest import BASELINE, make_facts, rule_data, split_evenly
+from .conftest import BASELINE, estate_payload, make_facts, rule_data, split_evenly
 
 PURE_PACKAGES = [
     Path(__file__).parents[1] / "src" / "decision_engine" / "core",
@@ -73,7 +74,8 @@ def test_death_before_any_rule_set_is_not_determinable(registry):
 
 
 def test_rule_logic_can_decline_and_the_rule_set_is_still_recorded(registry):
-    decision = evaluate(make_facts(parties=[]), registry, BASELINE)
+    facts = make_facts(parties=[], estate=estate_payload(affiants=[]))
+    decision = evaluate(facts, registry, BASELINE)
     assert decision.reasons == (ReasonCode.FACT_PATTERN_NOT_COVERED,)
     assert decision.rule_set is not None
 
@@ -200,8 +202,20 @@ def facts_strategy(draw):
             "requires_multiple_signatures": draw(st.booleans()),
             "restraining_order_served": draw(st.booleans()),
             "withdrawal_notice_received": draw(st.booleans()),
+            "ownership_instrument_issued": draw(st.booleans()),
         },
-        "probate_opened": draw(st.booleans()),
+        "estate": {
+            "administration": draw(st.sampled_from(list(AdministrationStatus))).value,
+            "declared_value": draw(
+                st.one_of(st.none(), st.just(f"{cents // 100}.{cents % 100:02d}"))
+            ),
+            "has_real_property_in_jurisdiction": draw(st.one_of(st.none(), st.booleans())),
+            "affiants": [
+                {"party_id": party["party_id"], "capacity": "successor"}
+                for party in parties[: draw(st.integers(min_value=0, max_value=count))]
+                if party["relationship"] not in {"trust", "representative"}
+            ],
+        },
         "parties": parties,
     }
     return Facts.model_validate_json(json.dumps(payload))

@@ -102,11 +102,27 @@ def render_markdown(scenarios: list[Scenario]) -> str:
 
 def _describe_facts(facts: Facts) -> str:
     parties = ", ".join(f"{p.party_id} {p.relationship.value}" for p in facts.parties) or "none"
-    probate = "probate opened" if facts.probate_opened else "no probate"
     return (
         f"{facts.jurisdiction.value}; died {facts.date_of_death.isoformat()}; "
         f"evaluated {facts.as_of_date.isoformat()}; {facts.account.account_type.value} account "
-        f"${facts.account.balance}{_describe_holders(facts)}; {probate}; parties: {parties}"
+        f"${facts.account.balance}{_describe_holders(facts)}; {_describe_estate(facts)}; "
+        f"parties: {parties}"
+    )
+
+
+def _describe_estate(facts: Facts) -> str:
+    estate = facts.estate
+    value = "not declared" if estate.declared_value is None else f"${estate.declared_value}"
+    real_property = {None: "unknown", True: "yes", False: "no"}[
+        estate.has_real_property_in_jurisdiction
+    ]
+    affiants = ", ".join(
+        f"{a.party_id} {a.capacity.value}" + (f" for {a.on_behalf_of}" if a.on_behalf_of else "")
+        for a in estate.affiants
+    )
+    return (
+        f"administration: {estate.administration.value}; declared estate {value}; "
+        f"real property: {real_property}; affiants: {affiants or 'none'}"
     )
 
 

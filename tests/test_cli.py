@@ -8,7 +8,7 @@ import pytest
 
 from decision_engine import cli
 
-from .conftest import facts_payload
+from .conftest import account_payload, facts_payload
 
 SSN_LIKE_VALUE = "123-45-6789"
 
@@ -41,7 +41,8 @@ def test_evaluate_reads_stdin(monkeypatch, capsys):
 
 
 def test_invalid_input_reports_paths_not_values(monkeypatch, capsys):
-    stdin = json.dumps(facts_payload(ssn=SSN_LIKE_VALUE, probate_opened="maybe")).encode()
+    account = account_payload(ownership_instrument_issued="maybe")
+    stdin = json.dumps(facts_payload(ssn=SSN_LIKE_VALUE, account=account)).encode()
     code, out, err = _run(monkeypatch, capsys, ["evaluate", "-"], stdin)
     assert code == cli.EXIT_INVALID_INPUT
     assert out == ""

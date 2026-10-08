@@ -42,7 +42,11 @@ def _scenario_yaml(
       requires_multiple_signatures: false
       restraining_order_served: false
       withdrawal_notice_received: false
-    probate_opened: false
+      ownership_instrument_issued: false
+    estate:
+      administration: none
+      declared_value: null
+      has_real_property_in_jurisdiction: null
     parties: []
   expected:
     {expected}

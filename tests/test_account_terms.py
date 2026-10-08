@@ -35,7 +35,9 @@ def _parse(account_type, holders, parties=PARTIES):
     ("account_type", "holders"),
     [
         ("sole", []),
-        ("joint", [_holder("P1", "co_owner")]),
+        ("joint_with_survivorship", [_holder("P1", "co_owner")]),
+        ("joint_without_survivorship", [_holder("P1", "co_owner")]),
+        ("joint_without_survivorship", [_holder("P1", "co_owner"), _holder("P2", "pod_payee")]),
         ("payable_on_death", [_holder("P1", "pod_payee"), _holder("P2", "pod_payee")]),
         ("payable_on_death", [_holder("P1", "co_owner"), _holder("P2", "pod_payee")]),
         ("totten_trust", [_holder("P1", "totten_beneficiary")]),
@@ -51,8 +53,10 @@ def test_valid_account_terms_parse(account_type, holders):
     ("account_type", "holders", "message"),
     [
         ("sole", [_holder("P1", "co_owner")], "cannot have holders"),
-        ("joint", [], "needs at least one co_owner"),
-        ("joint", [_holder("P1", "pod_payee")], "cannot have holders"),
+        ("joint_with_survivorship", [], "needs at least one co_owner"),
+        ("joint_with_survivorship", [_holder("P1", "pod_payee")], "cannot have holders"),
+        ("joint_without_survivorship", [_holder("P1", "pod_payee")], "needs at least one co_owner"),
+        ("joint", [_holder("P1", "co_owner")], "Input should be"),
         ("payable_on_death", [_holder("P1", "co_owner")], "needs at least one pod_payee"),
         ("payable_on_death", [_holder("P1", "totten_beneficiary")], "cannot have holders"),
         ("totten_trust", [_holder("P1", "pod_payee")], "cannot have holders"),
@@ -65,7 +69,7 @@ def test_roles_must_fit_the_account_type(account_type, holders, message):
 
 def test_holders_must_be_listed_parties():
     with pytest.raises(ValidationError, match="must be listed in parties"):
-        _parse("joint", [_holder("P9", "co_owner")])
+        _parse("joint_with_survivorship", [_holder("P9", "co_owner")])
 
 
 def test_a_party_holds_one_role_only():
@@ -103,9 +107,18 @@ def test_terms_shares_are_complete_and_exact(holders, message):
         _parse("payable_on_death", holders)
 
 
-def test_payment_blocking_events_are_required_facts():
+@pytest.mark.parametrize(
+    "field",
+    [
+        "restraining_order_served",
+        "withdrawal_notice_received",
+        "dispute_notice_received",
+        "testamentary_disposition_notice_received",
+    ],
+)
+def test_payment_blocking_events_are_required_facts(field):
     account = account_payload()
-    del account["restraining_order_served"]
+    del account[field]
     with pytest.raises(ValidationError):
         Facts.model_validate_json(json.dumps(facts_payload(account=account)))
 
@@ -114,4 +127,4 @@ def test_holder_count_is_capped():
     parties = [{"party_id": f"P{i}", "relationship": "child"} for i in range(1, 23)]
     holders = [_holder(f"P{i}", "co_owner") for i in range(1, 22)]
     with pytest.raises(ValidationError):
-        _parse("joint", holders, parties=parties)
+        _parse("joint_with_survivorship", holders, parties=parties)

@@ -7,7 +7,7 @@ import pytest
 from decision_engine.golden import Scenario, load_scenarios, render_markdown, run_scenario
 from decision_engine.rules_loader import default_policy, default_registry
 
-from .conftest import TEST_CITATION, account_payload, facts_payload
+from .conftest import TEST_CITATION, account_payload, estate_payload, facts_payload
 
 GOLDEN_DIR = Path(__file__).parents[1] / "golden"
 SCENARIOS = load_scenarios(GOLDEN_DIR)
@@ -42,11 +42,17 @@ def _scenario_yaml(
       requires_multiple_signatures: false
       restraining_order_served: false
       withdrawal_notice_received: false
+      dispute_notice_received: false
+      testamentary_disposition_notice_received: false
       ownership_instrument_issued: false
+    decedent_resident_of_jurisdiction: null
     estate:
       administration: none
       declared_value: null
       has_real_property_in_jurisdiction: null
+      representative_application_elsewhere: null
+      successor_notice_given_on: null
+      claim_authorized_by_all_successors: null
     parties: []
   expected:
     {expected}
@@ -113,7 +119,7 @@ def test_render_lists_payees_and_citations():
 def test_render_describes_any_of_payment_and_holders():
     facts = facts_payload(
         account=account_payload(
-            account_type="joint",
+            account_type="joint_with_survivorship",
             holders=[
                 {"party_id": "P1", "role": "co_owner", "survived_decedent": True},
                 {"party_id": "P2", "role": "co_owner", "survived_decedent": False},
@@ -179,3 +185,29 @@ def test_render_shows_terms_shares():
         strict=False,
     )
     assert "P1 pod_payee 7/10 by terms" in render_markdown([scenario])
+
+
+def test_render_shows_washington_facts():
+    facts = facts_payload(
+        decedent_resident_of_jurisdiction=True,
+        estate=estate_payload(
+            successor_notice_given_on="2026-02-01",
+            representative_application_elsewhere=False,
+            claim_authorized_by_all_successors=True,
+        ),
+        jurisdiction="TX",
+    )
+    scenario = Scenario.model_validate(
+        {
+            "id": "GS-TEST-004",
+            "title": "Washington-facts scenario used only to test rendering.",
+            "facts": facts,
+            "expected": {"outcome": "not_determinable", "reasons": ["unsupported_jurisdiction"]},
+        },
+        strict=False,
+    )
+    table = render_markdown([scenario])
+    assert "resident: yes" in table
+    assert "PR application elsewhere: no" in table
+    assert "claim authorized by all successors: yes" in table
+    assert "successors notified 2026-02-01" in table

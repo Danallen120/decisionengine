@@ -163,7 +163,8 @@ _REGISTRY = RuleRegistry([RuleSet(data=rule_data(), logic=split_evenly)])
 
 
 _REQUIRED_ROLE = {
-    AccountType.JOINT: "co_owner",
+    AccountType.JOINT_WITH_SURVIVORSHIP: "co_owner",
+    AccountType.JOINT_WITHOUT_SURVIVORSHIP: "co_owner",
     AccountType.PAYABLE_ON_DEATH: "pod_payee",
     AccountType.TOTTEN_TRUST: "totten_beneficiary",
 }
@@ -195,6 +196,7 @@ def facts_strategy(draw):
         "jurisdiction": draw(st.sampled_from(list(Jurisdiction))).value,
         "date_of_death": date_of_death.isoformat(),
         "as_of_date": as_of.isoformat(),
+        "decedent_resident_of_jurisdiction": draw(st.one_of(st.none(), st.booleans())),
         "account": {
             "account_type": account_type.value,
             "balance": f"{cents // 100}.{cents % 100:02d}",
@@ -202,6 +204,8 @@ def facts_strategy(draw):
             "requires_multiple_signatures": draw(st.booleans()),
             "restraining_order_served": draw(st.booleans()),
             "withdrawal_notice_received": draw(st.booleans()),
+            "dispute_notice_received": draw(st.booleans()),
+            "testamentary_disposition_notice_received": draw(st.booleans()),
             "ownership_instrument_issued": draw(st.booleans()),
         },
         "estate": {
@@ -210,6 +214,13 @@ def facts_strategy(draw):
                 st.one_of(st.none(), st.just(f"{cents // 100}.{cents % 100:02d}"))
             ),
             "has_real_property_in_jurisdiction": draw(st.one_of(st.none(), st.booleans())),
+            "representative_application_elsewhere": draw(st.one_of(st.none(), st.booleans())),
+            "successor_notice_given_on": draw(
+                st.one_of(
+                    st.none(), st.just(date_of_death.isoformat()), st.just(as_of.isoformat())
+                ),
+            ),
+            "claim_authorized_by_all_successors": draw(st.one_of(st.none(), st.booleans())),
             "affiants": [
                 {"party_id": party["party_id"], "capacity": "successor"}
                 for party in parties[: draw(st.integers(min_value=0, max_value=count))]

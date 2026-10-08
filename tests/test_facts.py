@@ -25,7 +25,7 @@ def _parse(payload):
 
 def test_valid_facts_parse_and_are_frozen():
     facts = make_facts()
-    assert facts.schema_version == "3"
+    assert facts.schema_version == "4"
     with pytest.raises(ValidationError):
         facts.as_of_date = facts.date_of_death  # type: ignore[misc]
 

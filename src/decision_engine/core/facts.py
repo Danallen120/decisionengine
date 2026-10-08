@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 from decision_engine.core.types import Money, Share
 
-FACTS_SCHEMA_VERSION: Final = "3"
+FACTS_SCHEMA_VERSION: Final = "4"
 MAX_PARTIES: Final = 50
 MAX_ACCOUNT_HOLDERS: Final = 20
 
@@ -120,7 +120,9 @@ class AccountType(StrEnum):
     """How the account was set up, per its terms."""
 
     SOLE = "sole"
-    JOINT = "joint"
+    JOINT_WITH_SURVIVORSHIP = "joint_with_survivorship"
+    JOINT_WITHOUT_SURVIVORSHIP = "joint_without_survivorship"
+    """The decedent's funds pass to the estate unless they named a POD payee for them."""
     PAYABLE_ON_DEATH = "payable_on_death"
     TOTTEN_TRUST = "totten_trust"
 
@@ -137,7 +139,11 @@ class HolderRole(StrEnum):
 _ROLE_RULES: Final[dict[AccountType, tuple[frozenset[HolderRole], HolderRole | None]]] = {
     # account type: (roles allowed, role that must be present)
     AccountType.SOLE: (frozenset(), None),
-    AccountType.JOINT: (frozenset({HolderRole.CO_OWNER}), HolderRole.CO_OWNER),
+    AccountType.JOINT_WITH_SURVIVORSHIP: (frozenset({HolderRole.CO_OWNER}), HolderRole.CO_OWNER),
+    AccountType.JOINT_WITHOUT_SURVIVORSHIP: (
+        frozenset({HolderRole.CO_OWNER, HolderRole.POD_PAYEE}),
+        HolderRole.CO_OWNER,
+    ),
     AccountType.PAYABLE_ON_DEATH: (
         frozenset({HolderRole.CO_OWNER, HolderRole.POD_PAYEE}),
         HolderRole.POD_PAYEE,
@@ -189,6 +195,12 @@ class Account(_StrictModel):
     )
     withdrawal_notice_received: bool = Field(
         description="A party's written notice restricting withdrawals has been received.",
+    )
+    dispute_notice_received: bool = Field(
+        description="Written notice of a dispute over the funds has been received.",
+    )
+    testamentary_disposition_notice_received: bool = Field(
+        description="Written notice that a will disposes of this account has been received.",
     )
     ownership_instrument_issued: bool = Field(
         description=(
@@ -263,16 +275,29 @@ class Estate(_StrictModel):
         ),
     )
     has_real_property_in_jurisdiction: bool | None
+    representative_application_elsewhere: bool | None = Field(
+        description=(
+            "An application to appoint a personal representative is pending or has been "
+            "granted outside the jurisdiction."
+        ),
+    )
+    successor_notice_given_on: date | None = Field(
+        description="Date the claimant served or mailed notice of the claim to other successors.",
+    )
+    claim_authorized_by_all_successors: bool | None = Field(
+        description="The claimant has written authority from every other interested successor.",
+    )
     affiants: tuple[Affiant, ...] = Field(default=(), max_length=MAX_PARTIES)
 
 
 class Facts(_StrictModel):
     """Everything the engine may consider for one account."""
 
-    schema_version: Literal["3"] = FACTS_SCHEMA_VERSION
+    schema_version: Literal["4"] = FACTS_SCHEMA_VERSION
     jurisdiction: Jurisdiction
     date_of_death: date
     as_of_date: date = Field(description="Date the decision is evaluated for. Never the clock.")
+    decedent_resident_of_jurisdiction: bool | None
     account: Account
     estate: Estate
     parties: tuple[Party, ...] = Field(max_length=MAX_PARTIES)
@@ -291,6 +316,10 @@ class Facts(_StrictModel):
             msg = f"account holders must be listed in parties: {sorted(unknown)}"
             raise ValueError(msg)
         _check_affiants(self.estate.affiants, {p.party_id: p.relationship for p in self.parties})
+        notice = self.estate.successor_notice_given_on
+        if notice is not None and not self.date_of_death <= notice <= self.as_of_date:
+            msg = "successor_notice_given_on must be between date_of_death and as_of_date"
+            raise ValueError(msg)
         return self
 
 

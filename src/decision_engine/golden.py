@@ -120,10 +120,24 @@ def _describe_estate(facts: Facts) -> str:
         f"{a.party_id} {a.capacity.value}" + (f" for {a.on_behalf_of}" if a.on_behalf_of else "")
         for a in estate.affiants
     )
+    extras = [
+        f"{label}: {_yes_no(flag)}"
+        for label, flag in (
+            ("resident", facts.decedent_resident_of_jurisdiction),
+            ("PR application elsewhere", estate.representative_application_elsewhere),
+            ("claim authorized by all successors", estate.claim_authorized_by_all_successors),
+        )
+    ]
+    if estate.successor_notice_given_on is not None:
+        extras.append(f"successors notified {estate.successor_notice_given_on.isoformat()}")
     return (
         f"administration: {estate.administration.value}; declared estate {value}; "
-        f"real property: {real_property}; affiants: {affiants or 'none'}"
+        f"real property: {real_property}; affiants: {affiants or 'none'}; " + "; ".join(extras)
     )
+
+
+def _yes_no(flag: bool | None, /) -> str:  # noqa: FBT001 - maps a fact value to text
+    return {None: "unknown", True: "yes", False: "no"}[flag]
 
 
 def _describe_holders(facts: Facts) -> str:

@@ -98,3 +98,50 @@ def test_administration_status_has_three_states():
 def test_old_probate_flag_is_rejected():
     with pytest.raises(ValidationError):
         Facts.model_validate_json(json.dumps(facts_payload(probate_opened=False)))
+
+
+# ── REQ-CORE-006: Washington-driven facts ───────────────
+
+
+@pytest.mark.parametrize(
+    ("notice", "valid"),
+    [
+        ("2026-01-15", True),  # day of death
+        ("2026-03-01", True),  # as-of date
+        ("2026-01-14", False),  # before death
+        ("2026-03-02", False),  # after the as-of date
+    ],
+)
+def test_successor_notice_date_falls_between_death_and_evaluation(notice, valid):
+    if valid:
+        assert _parse(successor_notice_given_on=notice).estate.successor_notice_given_on is not None
+    else:
+        with pytest.raises(ValidationError, match="successor_notice_given_on"):
+            _parse(successor_notice_given_on=notice)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "representative_application_elsewhere",
+        "successor_notice_given_on",
+        "claim_authorized_by_all_successors",
+    ],
+)
+def test_new_estate_facts_must_be_stated_even_when_unknown(field):
+    estate = estate_payload()
+    del estate[field]
+    with pytest.raises(ValidationError):
+        Facts.model_validate_json(json.dumps(facts_payload(estate=estate)))
+    assert _parse(**{field: None}).estate.model_dump()[field] is None
+
+
+def test_residency_must_be_stated_even_when_unknown():
+    payload = facts_payload()
+    del payload["decedent_resident_of_jurisdiction"]
+    with pytest.raises(ValidationError):
+        Facts.model_validate_json(json.dumps(payload))
+    facts = Facts.model_validate_json(
+        json.dumps(facts_payload(decedent_resident_of_jurisdiction=None))
+    )
+    assert facts.decedent_resident_of_jurisdiction is None

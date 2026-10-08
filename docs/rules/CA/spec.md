@@ -86,18 +86,19 @@ Sections 6401 and 6402 set intestate shares: community property to the spouse, a
 
 ## Facts the engine will need
 
-**Already in the schema** (REQ-CORE-004):
+**In the schema** (REQ-CORE-004):
 - Account type: sole, joint, POD, Totten trust.
 - Holders by role (co-owner, POD payee, Totten beneficiary), with survivorship and any terms shares.
 - Whether the terms require multiple signatures.
 - Whether a restraining order or a written withdrawal notice has been received.
 - Former-spouse and former-domestic-partner relationships (§ 5040).
 
-**Still needed for Path B** (a schema change for owner approval):
-- The declared gross value of California property, excluding § 13050 property, as stated in the affidavit.
-- Whether the estate includes California real property.
-- Administration status: none / proceeding exists with personal-representative consent / proceeding exists without consent. This replaces today's yes/no `probate_opened`.
-- Affiants (by party ID) and the capacity each signs in (successor, or a § 13051 representative).
+**Also in the schema for Path B** (REQ-CORE-005):
+- `estate.declared_value`: the declared gross value of California property, excluding § 13050 property, as stated in the affidavit (`null` if not declared).
+- `estate.has_real_property_in_jurisdiction`: whether the estate includes California real property (§ 13103).
+- `estate.administration`: none / opened with the personal representative's written consent / opened without consent (§ 13101(a)(4)).
+- `estate.affiants`: who signs, as successor or as a § 13051 representative acting for a listed successor.
+- `account.ownership_instrument_issued`: whether evidence of ownership could be required (§ 13102).
 
 **Institution policy, not facts** (REQ-POLICY-001): extra waiting days, extra documents, and declined account types or balances.
 

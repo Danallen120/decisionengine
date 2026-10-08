@@ -12,12 +12,11 @@ coverage yield a reason code instead (REQ-RULES-001).
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import date
-from hashlib import sha256
 from typing import Annotated, Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-from decision_engine.core.canonical import canonical_json
+from decision_engine.core.canonical import sha256_hex
 from decision_engine.core.decision import ReasonCode, RuleResult, RuleSetRef
 from decision_engine.core.facts import Facts, Jurisdiction
 from decision_engine.core.types import Citation, Money, PlainEnglish, SemVer
@@ -96,7 +95,7 @@ class RuleSetData(_StrictModel):
 
     def content_hash(self) -> str:
         """SHA-256 of the canonical JSON form; independent of file formatting."""
-        return _sha256_hex(canonical_json(self.model_dump(mode="json")))
+        return sha256_hex(self)
 
 
 RuleLogic = Callable[[Facts, RuleSetData], RuleResult]
@@ -136,9 +135,7 @@ class RuleRegistry:
         ordered = sorted(rule_sets, key=lambda rs: (rs.data.jurisdiction, rs.data.effective_from))
         _check_no_duplicates_or_overlaps(ordered)
         self._rule_sets: tuple[RuleSet, ...] = tuple(ordered)
-        self._hash = _sha256_hex(
-            canonical_json([rule_set.ref().model_dump(mode="json") for rule_set in ordered]),
-        )
+        self._hash = sha256_hex([rule_set.ref().model_dump(mode="json") for rule_set in ordered])
 
     @property
     def registry_hash(self) -> str:
@@ -173,7 +170,3 @@ def _overlaps(earlier: RuleSetData, later: RuleSetData) -> bool:
     if earlier.jurisdiction is not later.jurisdiction:
         return False
     return earlier.effective_through is None or earlier.effective_through >= later.effective_from
-
-
-def _sha256_hex(text: str) -> str:
-    return sha256(text.encode("utf-8")).hexdigest()

@@ -141,3 +141,40 @@ def test_missing_policy_file_fails_cleanly(monkeypatch, capsys, tmp_path):
     code, _, err = _run(monkeypatch, capsys, argv, stdin)
     assert code == cli.EXIT_INVALID_INPUT
     assert "could not be read" in json.loads(err)["error"]
+
+
+def test_serve_binds_loopback_only(monkeypatch, capsys):
+    calls = {}
+
+    def fake_run(app, **kwargs):
+        calls.update(kwargs, app=app)
+
+    monkeypatch.setattr("uvicorn.run", fake_run)
+    code, _, _ = _run(monkeypatch, capsys, ["serve", "--port", "8123"])
+    assert code == cli.EXIT_OK
+    assert calls["host"] == "127.0.0.1"
+    assert calls["port"] == 8123
+    assert calls["server_header"] is False
+
+
+def test_serve_with_bad_policies_directory_fails_cleanly(monkeypatch, capsys, tmp_path):
+    (tmp_path / "bad.yaml").write_text("institution: Not Valid\n")
+    monkeypatch.setattr("uvicorn.run", lambda *_args, **_kwargs: None)
+    code, _, err = _run(monkeypatch, capsys, ["serve", "--policies", str(tmp_path)])
+    assert code == cli.EXIT_INVALID_INPUT
+    assert "could not be loaded" in err
+
+
+def test_serve_warns_when_ui_is_not_built(monkeypatch, capsys, tmp_path):
+    monkeypatch.setattr("uvicorn.run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(cli, "__file__", str(tmp_path / "cli.py"))
+    _, _, err = _run(monkeypatch, capsys, ["serve"])
+    assert "UI not built" in err
+
+
+def test_serve_uses_built_ui_when_present(monkeypatch, capsys, tmp_path):
+    (tmp_path / "api" / "static").mkdir(parents=True)
+    monkeypatch.setattr("uvicorn.run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(cli, "__file__", str(tmp_path / "cli.py"))
+    _, _, err = _run(monkeypatch, capsys, ["serve"])
+    assert "UI not built" not in err

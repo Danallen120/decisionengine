@@ -19,16 +19,20 @@ from decision_engine.rules_loader import (
     RuleLoadError,
     default_policy,
     default_registry,
+    load_policies,
     load_policy,
 )
+from decision_engine.safe_errors import MAX_LOC_PART_CHARS, safe_errors
 
 MAX_INPUT_BYTES: Final = 10 * 1024 * 1024
 MAX_BATCH_ITEMS: Final = 1000
-MAX_LOC_PART_CHARS: Final = 64
 
 EXIT_OK: Final = 0
 EXIT_SOME_INVALID: Final = 1
 EXIT_INVALID_INPUT: Final = 2
+
+SERVE_HOST: Final = "127.0.0.1"
+DEFAULT_PORT: Final = 8000
 
 
 class InputError(Exception):
@@ -42,6 +46,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "golden":
             sys.stdout.write(render_markdown(load_scenarios(args.directory)))
             return EXIT_OK
+        if args.command == "serve":
+            return _serve(args.port, args.policies)
         policy = _load_policy(args.policy)
         raw = _read_capped(args.input)
         rules = default_registry()
@@ -69,7 +75,35 @@ def _parser() -> argparse.ArgumentParser:
         )
     golden = commands.add_parser("golden", help="render golden scenarios for attorney review")
     golden.add_argument("directory", type=Path, help="directory of golden scenario YAML files")
+    serve = commands.add_parser("serve", help=f"run the local web tool on {SERVE_HOST} only")
+    serve.add_argument("--port", type=int, default=DEFAULT_PORT, help="port (default %(default)s)")
+    serve.add_argument(
+        "--policies",
+        type=Path,
+        help="directory of institution policy YAML files to offer alongside the baseline",
+    )
     return parser
+
+
+def _serve(port: int, policies_dir: Path | None) -> int:
+    # Imported here so the CLI's other commands don't need the web stack loaded.
+    import uvicorn  # noqa: PLC0415
+
+    from decision_engine.api import create_app  # noqa: PLC0415
+
+    try:
+        policies = load_policies(policies_dir)
+    except (ValidationError, OSError, RuleLoadError) as error:
+        msg = "policies directory could not be loaded"
+        raise InputError(msg) from error
+    static_dir = Path(__file__).parent / "api" / "static"
+    if not static_dir.is_dir():
+        sys.stderr.write(
+            "UI not built: run `npm --prefix frontend run build`. Serving the API only.\n"
+        )
+    app = create_app(policies=policies, static_dir=static_dir)
+    uvicorn.run(app, host=SERVE_HOST, port=port, log_level="info", server_header=False)
+    return EXIT_OK
 
 
 def _load_policy(path: Path | None) -> InstitutionPolicy:
@@ -115,7 +149,7 @@ def _evaluate_one(
     try:
         facts = Facts.model_validate_json(raw)
     except ValidationError as error:
-        _write_json(err, {"errors": _safe_errors(error)})
+        _write_json(err, {"errors": safe_errors(error)})
         return EXIT_INVALID_INPUT
     out.write(canonical_json(evaluate(facts, rules, policy)) + "\n")
     return EXIT_OK
@@ -143,27 +177,13 @@ def _evaluate_batch(
         try:
             facts = Facts.model_validate_json(json.dumps(item))
         except ValidationError as error:
-            results.append({"index": index, "errors": _safe_errors(error)})
+            results.append({"index": index, "errors": safe_errors(error)})
             continue
         decision = evaluate(facts, rules, policy).model_dump(mode="json")
         results.append({"index": index, "decision": decision})
     out.write(canonical_json(results) + "\n")
     has_errors = any("errors" in result for result in results)
     return EXIT_SOME_INVALID if has_errors else EXIT_OK
-
-
-def _safe_errors(error: ValidationError) -> list[dict[str, object]]:
-    """Field paths and error types only; never the offending input values."""
-    return [
-        {
-            "loc": [
-                part if isinstance(part, int) else str(part)[:MAX_LOC_PART_CHARS]
-                for part in e["loc"]
-            ],
-            "type": e["type"],
-        }
-        for e in error.errors(include_url=False, include_input=False, include_context=False)
-    ]
 
 
 def _write_json(stream: TextIO, payload: object) -> None:

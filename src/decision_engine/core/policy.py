@@ -7,12 +7,11 @@ decision records the policy's institution, version, and content hash.
 """
 
 from datetime import timedelta
-from hashlib import sha256
 from typing import Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from decision_engine.core.canonical import canonical_json
+from decision_engine.core.canonical import sha256_hex
 from decision_engine.core.decision import (
     Determination,
     DocumentSource,
@@ -63,7 +62,7 @@ class InstitutionPolicy(_StrictModel):
 
     def content_hash(self) -> str:
         """SHA-256 of the canonical JSON form; independent of file formatting."""
-        return sha256(canonical_json(self).encode("utf-8")).hexdigest()
+        return sha256_hex(self)
 
     def ref(self) -> PolicyRef:
         """Identify this policy on a decision."""

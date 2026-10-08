@@ -23,8 +23,8 @@ Owns: system shape, contracts, and open design questions. Security controls live
 1. **Core engine**: `evaluate(facts, rules, policy) -> Decision`. It is pure and deterministic: no I/O, clock, randomness, network, or DB, and it imports only the standard library and Pydantic. Same facts + same rule set + same policy always give an identical decision. Rules and policy are loaded by an outer layer and passed in.
 2. **Rules**: per-state rule sets, versioned in git. Each is cited YAML data plus pure Python logic (`state_logic`). The engine selects exactly one by jurisdiction + date of death; ranges may not overlap.
 3. **CLI**: runs single, batch, and golden-suite evaluations. This is the v1 delivery path.
-4. **API**: FastAPI `/v1` with single and batch endpoints. This is the only layer with auth or PostgreSQL.
-5. **UI**: React, deferred.
+4. **API**: FastAPI `/v1`. Today it runs as a **local tool** (`decision-engine serve`, 127.0.0.1 only): `GET /v1/meta` and `POST /v1/evaluate`, with every route denied to non-loopback clients. Batch evaluation, API keys, and the PostgreSQL decision log arrive with production deployment.
+5. **UI**: React 19 + TypeScript guided form (`frontend/`), built into the API package and served same-origin. It collects facts only (no PII) and shows the decision, the reasons it can't decide, and a downloadable record.
 
 ### Contracts
 

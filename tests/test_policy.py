@@ -13,7 +13,7 @@ from decision_engine.core import (
     ReasonCode,
     evaluate,
 )
-from decision_engine.rules_loader import default_policy, load_policy
+from decision_engine.rules_loader import RuleLoadError, default_policy, load_policies, load_policy
 
 from .conftest import BASELINE, account_payload, make_facts, make_policy
 
@@ -148,3 +148,24 @@ def test_policy_files_load_from_yaml(tmp_path):
     policy = load_policy(path)
     assert policy.ref().institution == "example-bank"
     assert str(policy.decline_balance_above) == "50000.00"
+
+
+def test_policies_directory_adds_to_the_baseline(tmp_path):
+    (tmp_path / "bank.yaml").write_text(
+        "institution: example-bank\n"
+        "version: 1.0.0\n"
+        "description: Example institution policy used only in tests.\n",
+    )
+    policies = load_policies(tmp_path)
+    assert sorted(policies) == ["baseline", "example-bank"]
+    assert sorted(load_policies()) == ["baseline"]
+
+
+def test_duplicate_institution_policies_are_rejected(tmp_path):
+    (tmp_path / "a.yaml").write_text(
+        "institution: baseline\n"
+        "version: 9.9.9\n"
+        "description: Tries to replace the statutory baseline.\n",
+    )
+    with pytest.raises(RuleLoadError, match="more than one policy"):
+        load_policies(tmp_path)

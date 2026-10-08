@@ -34,6 +34,7 @@ Stack, auth model, data store, and PII posture come from `ARCHITECTURE.md`. Secu
 - Request and response models are separate. Batch item count and total payload size are capped server-side.
 
 ### HTTP boundary
+- Local tool: an ASGI middleware and a router-level dependency both refuse non-loopback clients, and `serve` binds 127.0.0.1 only. Production auth replaces this; it never widens it.
 - Auth is applied with a router-level `Depends()`, so new routes are denied by default.
 - `/docs`, `/redoc`, and `/openapi.json` are off outside local dev.
 - CORS is off until a UI exists. After that, allow exact origins only, and never `*` with credentials.
@@ -64,6 +65,6 @@ Stack, auth model, data store, and PII posture come from `ARCHITECTURE.md`. Secu
 | `{{CODE_QUALITY_PROMPT}}` | `~/Claude_Setup/Code_Security/Code Quality/00 General Code Quality Prompts.md` | Architecture (pure core, I/O at edges) |
 | `{{API_SECURITY_PROMPT}}` | `~/Claude_Setup/Code_Security/Web and API Security/06 Secure API Developer.md` | Architecture (REST `/v1`) |
 | `{{BACKEND_FRAMEWORK_PROMPT}}` | `~/Claude_Setup/Code_Security/Backend Frameworks/Python/` → `00 Secure Python Developer.md`, `03 Secure Fast API Developer.md`, `09 Secure Pydantic Developeer.md`. Add a persistence prompt (e.g. `05 Secure SQLAlchemy Developer.md`) once the library is chosen. | Backend: Python, FastAPI, Pydantic |
-| `{{FRONTEND_FRAMEWORK_PROMPT}}` | `~/Claude_Setup/Code_Security/Client Side Frameworks/ReactJS/00 React19 Secure Generator (JS).md`. Deferred (no UI in v1); JS vs. TS is TO BE DECIDED. | Frontend: React (deferred) |
+| `{{FRONTEND_FRAMEWORK_PROMPT}}` | `~/Claude_Setup/Code_Security/Client Side Frameworks/ReactJS/01 React19 Secure Generator (TS).md` | Frontend: React 19 + TypeScript (local tool) |
 | `{{AUTH_PROMPT}}` | No dedicated prompt. v1 is API keys only (rules above). The OAuth/JWT guidance in the API and FastAPI prompts does not apply. | Auth: API keys |
 | `{{DEPLOYMENT_PROMPT}}` | TO BE DECIDED. The library has no infrastructure prompt yet. | Deployment: TO BE DECIDED |

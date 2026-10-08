@@ -1,6 +1,6 @@
 """Pure, deterministic decision core. Imports only the standard library and pydantic."""
 
-from decision_engine.core.canonical import canonical_json
+from decision_engine.core.canonical import canonical_json, sha256_hex
 from decision_engine.core.decision import (
     AnyOfPayment,
     Decision,
@@ -70,4 +70,5 @@ __all__ = [
     "SharesPayment",
     "canonical_json",
     "evaluate",
+    "sha256_hex",
 ]

@@ -5,8 +5,10 @@ description = "Deterministic, statute-cited entitlement decision engine for dece
 readme = "README.md"
 requires-python = "==3.13.*"
 dependencies = [
+    "fastapi>=0.115,<1",
     "pydantic>=2.11,<3",
     "pyyaml>=6.0.2,<7",
+    "uvicorn>=0.32,<1",
 ]
 
 [project.scripts]
@@ -21,6 +23,7 @@ packages = ["src/decision_engine"]
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.13.1",
     "hypothesis",
     "import-linter",
     "mypy",
@@ -101,11 +104,15 @@ name = "Core engine depends on nothing outside itself except pydantic"
 type = "forbidden"
 source_modules = ["decision_engine.core"]
 forbidden_modules = [
+    "decision_engine.api",
     "decision_engine.cli",
     "decision_engine.golden",
     "decision_engine.rules_loader",
     "decision_engine.state_logic",
     "yaml",
+    "fastapi",
+    "starlette",
+    "uvicorn",
 ]
 
 [[tool.importlinter.contracts]]
@@ -113,6 +120,7 @@ name = "Layers"
 type = "layers"
 layers = [
     "decision_engine.cli",
+    "decision_engine.api",
     "decision_engine.golden",
     "decision_engine.rules_loader",
     "decision_engine.state_logic",

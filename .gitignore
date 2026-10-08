@@ -31,3 +31,8 @@ htmlcov/
 test-results.xml
 golden-scenarios.md
 requirements-audit.txt
+
+# Built UI (npm --prefix frontend run build)
+src/decision_engine/api/static/
+frontend/node_modules/
+frontend/coverage/

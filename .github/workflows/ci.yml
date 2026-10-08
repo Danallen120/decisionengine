@@ -76,3 +76,30 @@ jobs:
         run: |
           uv export --locked --format requirements-txt --no-emit-project -o requirements-audit.txt
           uv run --locked pip-audit --strict --disable-pip --require-hashes -r requirements-audit.txt
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies (no install scripts)
+        run: npm ci --ignore-scripts
+      - name: Types (strict)
+        run: npm run typecheck
+      - name: Tests and coverage (>= 80%)
+        run: npm run coverage
+      - name: Build
+        run: npx vite build
+      - name: Audit dependencies for known vulnerabilities
+        run: npm audit --audit-level=moderate

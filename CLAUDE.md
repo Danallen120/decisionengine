@@ -31,9 +31,13 @@ uv run lint-imports                    # architecture boundaries
 uv run pytest --cov                    # tests + golden scenarios, >= 80% overall
 uv run coverage report --fail-under=100 --include='src/decision_engine/core/*,src/decision_engine/state_logic/*'
 uv run decision-engine evaluate facts.json [--policy bank.yaml]   # or: batch, golden golden/
+uv run decision-engine serve [--port 8000] [--policies dir/]      # local web tool, 127.0.0.1 only
+npm --prefix frontend ci --ignore-scripts                         # frontend: install (no scripts)
+npm --prefix frontend run typecheck && npm --prefix frontend run coverage
+npm --prefix frontend run build                                   # outputs to src/decision_engine/api/static
 ```
 
-CI (`.github/workflows/ci.yml`) runs all of these plus `pip-audit`. Never weaken a gate to make a change pass.
+CI (`.github/workflows/ci.yml`) runs all of these plus `pip-audit` and `npm audit`. Never weaken a gate to make a change pass.
 
 ## Decided
 
@@ -44,12 +48,15 @@ CI (`.github/workflows/ci.yml`) runs all of these plus `pip-audit`. Never weaken
 | Coverage | 100% branch for `core/` and `state_logic/`; >= 80% overall |
 | Rule format | Hybrid: cited YAML data validated by `RuleSetData` + pure Python logic per (state, version) |
 | Institution policy | Stricter-only YAML per institution (`src/decision_engine/policies/`), recorded on every decision; `baseline` adds nothing |
-| CI | GitHub Actions, actions pinned by SHA; `checks` and `dependency-audit` are required to merge |
+| CI | GitHub Actions, actions pinned by SHA; `checks`, `dependency-audit`, and `frontend` are required to merge |
+| Local tool | FastAPI `/v1` (`decision_engine/api/`) serving a React 19 + TypeScript (strict) + Vite UI from `frontend/`; loopback-only; `decision-engine serve` |
+| Frontend dependencies | Exact versions, each published at least 2 weeks before adoption; `ignore-scripts=true`; Node LTS (`frontend/.nvmrc`) |
 
 ## Undecided workflow items
 
 | Item | Status |
 |---|---|
-| Persistence library and migrations tool | TO BE DECIDED |
+| Persistence library and migrations tool | TO BE DECIDED (the local tool stores nothing) |
+| Production authentication and hosting | TO BE DECIDED (the local tool's loopback guard stands in) |
 | Required reviewers; how attorney sign-off is recorded | TO BE DECIDED |
 | Rule and package versioning / release process | TO BE DECIDED |

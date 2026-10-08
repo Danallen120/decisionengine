@@ -95,3 +95,22 @@ def load_policy(path: Path) -> InstitutionPolicy:
 def default_policy() -> InstitutionPolicy:
     """The packaged statutory baseline policy, which adds nothing beyond the law."""
     return load_policy(Path(str(files("decision_engine") / "policies" / BASELINE_POLICY)))
+
+
+def load_policies(directory: Path | None = None) -> dict[str, InstitutionPolicy]:
+    """The baseline policy plus every policy file in ``directory``, keyed by institution.
+
+    Raises:
+        RuleLoadError: if two policies name the same institution.
+    """
+    baseline = default_policy()
+    policies = {baseline.institution: baseline}
+    if directory is None:
+        return policies
+    for path in sorted(directory.glob(RULE_DATA_GLOB)):
+        policy = load_policy(path)
+        if policy.institution in policies:
+            msg = f"more than one policy for institution {policy.institution!r}"
+            raise RuleLoadError(msg)
+        policies[policy.institution] = policy
+    return policies

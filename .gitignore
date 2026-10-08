@@ -1,0 +1,33 @@
+# OS / editor
+.DS_Store
+
+# Secrets (see .claude/rules/security.md)
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+*.egg-info/
+
+# Tool caches and reports
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.import_linter_cache/
+
+# Local Claude Code settings
+.claude/settings.local.json
+
+# CI outputs
+test-results.xml
+golden-scenarios.md
+requirements-audit.txt

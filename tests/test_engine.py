@@ -1,0 +1,189 @@
+"""REQ-CORE-003: pure, deterministic evaluation; REQ-RULES-001 outcomes."""
+
+import ast
+import json
+import os
+import subprocess
+import sys
+from datetime import date, timedelta
+from pathlib import Path
+
+from hypothesis import given
+from hypothesis import strategies as st
+
+from decision_engine.core import (
+    Decision,
+    Facts,
+    Jurisdiction,
+    Outcome,
+    OwnershipType,
+    ReasonCode,
+    Relationship,
+    RuleRegistry,
+    RuleSet,
+    canonical_json,
+    evaluate,
+)
+
+from .conftest import make_facts, rule_data, split_evenly
+
+PURE_PACKAGES = [
+    Path(__file__).parents[1] / "src" / "decision_engine" / "core",
+    Path(__file__).parents[1] / "src" / "decision_engine" / "state_logic",
+]
+ALLOWED_IMPORTS = {
+    "collections",
+    "dataclasses",
+    "datetime",
+    "decimal",
+    "decision_engine",
+    "enum",
+    "fractions",
+    "hashlib",
+    "json",
+    "pydantic",
+    "re",
+    "typing",
+}
+FORBIDDEN_CALLS = {"now", "today", "utcnow", "time", "monotonic", "perf_counter", "urandom"}
+
+
+# ── Outcomes ────────────────────────────────────────────
+
+
+def test_covered_facts_are_determined(registry):
+    decision = evaluate(make_facts(), registry)
+    assert decision.outcome is Outcome.DETERMINED
+    assert decision.rule_set is not None
+    assert decision.rule_set.version == "0.0.1"
+    assert decision.registry_hash == registry.registry_hash
+
+
+def test_unsupported_jurisdiction_is_not_determinable(registry):
+    decision = evaluate(make_facts(jurisdiction="TX"), registry)
+    assert decision.outcome is Outcome.NOT_DETERMINABLE
+    assert decision.reasons == (ReasonCode.UNSUPPORTED_JURISDICTION,)
+    assert decision.determination is None
+    assert decision.rule_set is None
+
+
+def test_death_before_any_rule_set_is_not_determinable(registry):
+    decision = evaluate(make_facts(date_of_death="2025-12-31"), registry)
+    assert decision.reasons == (ReasonCode.NO_RULE_SET_FOR_DATE_OF_DEATH,)
+
+
+def test_rule_logic_can_decline_and_the_rule_set_is_still_recorded(registry):
+    decision = evaluate(make_facts(parties=[]), registry)
+    assert decision.reasons == (ReasonCode.FACT_PATTERN_NOT_COVERED,)
+    assert decision.rule_set is not None
+
+
+# ── Determinism ─────────────────────────────────────────
+
+
+def test_repeated_evaluation_is_byte_identical(registry):
+    facts = make_facts()
+    assert canonical_json(evaluate(facts, registry)) == canonical_json(evaluate(facts, registry))
+
+
+def test_evaluation_is_identical_across_processes_and_hash_seeds():
+    script = (
+        "import json, sys\n"
+        "sys.path.insert(0, 'tests')\n"
+        "from conftest import make_facts, split_evenly, rule_data\n"
+        "from decision_engine.core import RuleRegistry, RuleSet, canonical_json, evaluate\n"
+        "registry = RuleRegistry([RuleSet(data=rule_data(), logic=split_evenly)])\n"
+        "print(canonical_json(evaluate(make_facts(), registry)))\n"
+    )
+    root = Path(__file__).parents[1]
+    outputs = set()
+    for seed in ("0", "1", "12345"):
+        env = {**os.environ, "PYTHONHASHSEED": seed}
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        outputs.add(result.stdout)
+    assert len(outputs) == 1
+
+
+def _pure_sources():
+    for package in PURE_PACKAGES:
+        yield from sorted(package.rglob("*.py"))
+
+
+def test_pure_packages_import_only_allowed_modules():
+    violations = []
+    for path in _pure_sources():
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Import):
+                roots = [alias.name.split(".")[0] for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                roots = [node.module.split(".")[0]]
+            else:
+                continue
+            violations += [f"{path.name}: {r}" for r in roots if r not in ALLOWED_IMPORTS]
+    assert not violations
+
+
+def test_pure_packages_never_read_clocks_or_randomness():
+    violations = []
+    for path in _pure_sources():
+        violations.extend(
+            f"{path.name}:{node.lineno} .{node.attr}"
+            for node in ast.walk(ast.parse(path.read_text()))
+            if isinstance(node, ast.Attribute) and node.attr in FORBIDDEN_CALLS
+        )
+    assert not violations
+
+
+def test_boundary_scan_detects_a_violation(tmp_path):
+    """Guards the guard: the scan must flag a clock read and a forbidden import."""
+    bad = tmp_path / "bad.py"
+    bad.write_text("import random\nfrom datetime import date\nx = date.today()\n")
+    tree = ast.parse(bad.read_text())
+    imports = {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+    calls = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    assert imports - ALLOWED_IMPORTS == {"random"}
+    assert calls & FORBIDDEN_CALLS == {"today"}
+
+
+# ── Properties ──────────────────────────────────────────
+
+_dates = st.dates(min_value=date(1900, 1, 1), max_value=date(2100, 12, 31))
+_REGISTRY = RuleRegistry([RuleSet(data=rule_data(), logic=split_evenly)])
+
+
+@st.composite
+def facts_strategy(draw):
+    date_of_death = draw(_dates)
+    as_of = date_of_death + timedelta(days=draw(st.integers(min_value=0, max_value=3650)))
+    count = draw(st.integers(min_value=0, max_value=6))
+    parties = [
+        {"party_id": f"P{i}", "relationship": draw(st.sampled_from(list(Relationship))).value}
+        for i in range(1, count + 1)
+    ]
+    cents = draw(st.integers(min_value=0, max_value=10**12))
+    payload = {
+        "jurisdiction": draw(st.sampled_from(list(Jurisdiction))).value,
+        "date_of_death": date_of_death.isoformat(),
+        "as_of_date": as_of.isoformat(),
+        "account": {
+            "ownership": draw(st.sampled_from(list(OwnershipType))).value,
+            "balance": f"{cents // 100}.{cents % 100:02d}",
+        },
+        "probate_opened": draw(st.booleans()),
+        "parties": parties,
+    }
+    return Facts.model_validate_json(json.dumps(payload))
+
+
+@given(facts=facts_strategy())
+def test_any_valid_facts_yield_a_valid_decision(facts):
+    text = canonical_json(evaluate(facts, _REGISTRY))
+    assert canonical_json(Decision.model_validate_json(text)) == text
+    assert text == canonical_json(evaluate(facts, _REGISTRY))

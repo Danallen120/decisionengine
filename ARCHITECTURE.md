@@ -16,44 +16,35 @@
 
 ## Initial Architecture (Provisional)
 
-Nothing is implemented yet. This section shows the intended design, based only on the inputs above.
+Owns: system shape, contracts, and open design questions. Security controls live in `.claude/rules/security.md`, and workflow lives in `CLAUDE.md`.
 
 ### Layers (dependencies point inward only)
 
-1. **Core engine** (pure Python package). `evaluate(facts) -> Decision`. It has no I/O, no clock reads, no randomness, no network or DB access, and no framework imports except Pydantic. The same facts and the same rule version always give the same decision.
-2. **Rules** (versioned code/data in git, one rule set per state). The engine selects a rule set by jurisdiction and the decedent's date of death. Every decision output cites a statute.
-3. **CLI**. A thin wrapper around the core that evaluates one fact set, evaluates a batch, and runs the golden-scenario suite. It runs locally; this is the v1 delivery path.
-4. **API** (FastAPI, `/v1`). A thin wrapper around the core with single and batch evaluation endpoints, synchronous and stateless. This is the only layer that touches PostgreSQL or handles auth.
-5. **UI** (React). Deferred, not in v1.
+1. **Core engine**: `evaluate(facts) -> Decision`. It is pure and deterministic: no I/O, clock, randomness, network, or DB, and it imports only the standard library and Pydantic. Same facts + same rule set always give an identical decision.
+2. **Rules**: per-state rule sets, versioned in git. The engine selects one by jurisdiction + date of death.
+3. **CLI**: runs single, batch, and golden-suite evaluations. This is the v1 delivery path.
+4. **API**: FastAPI `/v1` with single and batch endpoints. This is the only layer with auth or PostgreSQL.
+5. **UI**: React, deferred.
 
-### Core contracts
+### Contracts
 
-- **Facts** (Pydantic). Account and decedent facts the engine needs, including jurisdiction and date of death.
-- **Decision** (Pydantic). Payees and shares, required documents, earliest release date, liability-protection applicability, rule version, and a statute citation for each conclusion.
-- **Rule version**. Every decision records the rule version it used, so decisions can be reproduced.
+- **Facts**: account and decedent facts, including jurisdiction and date of death. Every date the engine uses (including the as-of date) is a fact, never read from the clock.
+- **Decision**: payees and shares, required documents, earliest release date, and liability-protection applicability. Each conclusion carries its statute citation. The decision also records the rule version and the rule-set hash.
+- **Decision log row** (API layer, append-only): facts hash, rule version, rule-set hash, output, timestamp, API key ID. Raw facts are never stored.
+- **API key**: stored hashed, revocable.
 
-### Persistence (API layer only)
+### Attorney-facing artifacts
 
-- **Decision log**, append-only: input facts hash, rule version, output, timestamp.
-- **API keys**: stored hashed, revocable.
-- The core engine and CLI have no persistence.
-
-### Attorney-facing artifacts (part of the system)
-
-For each state there is a plain-English rule spec with citations, an open-questions list, and a golden-scenario table (facts -> expected decision -> citation). The golden-scenario table is the test suite, so the scenarios and the rules must not drift apart.
+For each state: a rule spec, an open-questions list, and a golden-scenario table. The golden-scenario table is the test suite.
 
 ### Assumptions (unconfirmed)
 
-- **A1:** The rule spec, open questions, and golden scenarios are files kept in the repo next to the rules, so attorneys review the same versions the code runs.
-- **A2:** Only the facts hash goes in the decision log. The raw facts are not logged, which is consistent with "no PII stored".
-- **A3:** Batch evaluation is a loop over single evaluations in the core, with no special batching logic.
-- **A4:** "Earliest release date" is computed from dates supplied in the facts, never from the system clock, which keeps the engine deterministic.
+- **A1:** The attorney-facing artifacts live in the repo next to the rules, so attorneys review the same versions the code runs.
+- **A2:** Batch evaluation is a loop over single evaluations, with no special batching logic.
 
-### Open questions / unknowns
+### Open questions
 
-- **Deployment model:** TO BE DECIDED.
-- **Scale targets:** TO BE DECIDED (expected low).
-- **Human authentication:** the input says "human login until a UI exists". Does this mean *no* human login until a UI exists? It needs clarifying.
-- **PII and the output log:** do account facts (for example, heir names) contain PII by nature? If so, logging the decision *output* may conflict with "no PII stored".
-- **Unsupported or ambiguous cases:** how does the engine report a jurisdiction, date range, or fact pattern the rules don't cover (an explicit "undecidable" result vs. an error)?
-- **Rule set by date of death:** what is the effective-date boundary for each rule set version?
+- **Human authentication:** "human login until a UI exists" may mean *no* human login until a UI exists.
+- **PII in logged output:** decision output (payees) may identify people, which would conflict with "no PII stored".
+- **Unsupported cases:** when facts fall outside the rules (unsupported jurisdiction, date, or fact pattern), does the engine return an explicit "undecidable" result or raise an error? Either way, it must not fall back to a default rule set.
+- **Effective dates:** what is the date-of-death boundary for each rule set version?

@@ -12,7 +12,7 @@ For one deposit account of a Washington decedent, the engine answers four questi
 3. What is the earliest date it may pay?
 4. Does a statute protect the institution from liability if it pays as decided?
 
-Anything outside the paths below is **not determinable** and goes to a person.
+Anything outside the paths below is **not determinable** and goes to a person. **Coverage begins with deaths on April 1, 2022** (owner decision W1, 2026-10-07). Earlier deaths are not determinable.
 
 ## How Washington differs from California
 
@@ -85,8 +85,8 @@ Applies to funds that belong to the estate: a single account, the decedent's sha
 
 | Case | Rule | Status |
 |---|---|---|
-| **Community property agreement** | Pay all funds in the deceased spouse's name to the surviving spouse, on a certified copy of the recorded agreement plus the spouse's affidavit that it was valid and in force at death. | Proposed for v1, if an attorney confirms (W7) |
-| **Balance at or below $2,500** | Payment may go to the surviving spouse, next of kin, funeral director, or a creditor who "may appear to be entitled", on proof of death and an affidavit that no personal representative was appointed. The institution may require waivers, indemnity and other proofs (Policy). | Proposed out of scope for v1 (W8) |
+| **Community property agreement** | Pay all funds in the deceased spouse's name to the surviving spouse, on a certified copy of the recorded agreement plus the spouse's affidavit that it was valid and in force at death. | Under owner review (W7; analysis in open-questions) |
+| **Balance at or below $2,500** | Payment may go to the surviving spouse, next of kin, funeral director, or a creditor who "may appear to be entitled", on proof of death and an affidavit that no personal representative was appointed. The institution may require waivers, indemnity and other proofs (Policy). | Under owner review (W8; analysis in open-questions) |
 | **Foreign personal representative** | After 60 days, with the documents listed in RCW 30A.22.200. | Out of scope for v1 |
 
 ## Intestate shares (reference only)
@@ -126,3 +126,4 @@ These assume W4 resolves as "the later of death + 40 days or notice + 10 days" a
 | GS-WA-012 | POD; notice of testamentary disposition received | Not determinable (RCW 11.11.040, 11.11.050). |
 | GS-WA-013 | POD beneficiary is a former spouse | Not determinable (RCW 11.07.010). |
 | GS-WA-014 | Joint without survivorship; decedent's share; small-estate facts as in 001 | Path B applies to the decedent's funds. |
+| GS-WA-015 | As 001, but died 2022-03-31 | Not determinable: before coverage starts (W1). |

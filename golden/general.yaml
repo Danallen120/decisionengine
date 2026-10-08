@@ -1,0 +1,20 @@
+# Golden scenarios that do not depend on any state's rules.
+# Render for review: uv run decision-engine golden golden/
+- id: GS-GEN-001
+  title: A state with no rule sets is never decided; the case goes to a person.
+  facts:
+    jurisdiction: TX
+    date_of_death: "2026-01-15"
+    as_of_date: "2026-03-01"
+    account:
+      ownership: sole
+      balance: "12500.00"
+    probate_opened: false
+    parties:
+      - party_id: P1
+        relationship: surviving_spouse
+  expected:
+    outcome: not_determinable
+    reasons: [unsupported_jurisdiction]
+    determination: null
+    rule_set: null

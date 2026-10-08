@@ -6,7 +6,7 @@ Owns: how to work in this repo. System design is in `ARCHITECTURE.md` (imported 
 
 ## Status
 
-Bootstrap mode: there is no implementation code yet. If a task depends on an undecided item (see the table below or the ARCHITECTURE.md open questions), ask instead of picking.
+Foundation built: schemas, engine, rule loading, golden runner, CLI, and CI. No state rules exist yet, so every decision is `not_determinable`. If a task depends on an undecided item (see the table below or the ARCHITECTURE.md open questions), ask instead of picking.
 
 ## Legal-rule guardrails
 
@@ -21,16 +21,34 @@ Bootstrap mode: there is no implementation code yet. If a task depends on an und
 - **Plan first for high-risk areas.** Before changing the core engine, rule sets, fact/decision schemas, or the decision log, state the plan and wait for confirmation.
 - **Every new GitHub issue MUST use the requirement template** (`.github/ISSUE_TEMPLATE/requirement.yml`), so each issue is a structured, testable requirement: a `REQ-<MODULE>-<###>` ID, an RFC 2119 Description, and testable acceptance criteria, plus Legal Rule Context when the requirement encodes law. If `gh` can't render the form, write the body with the template's sections and fields. No free-form issues.
 
+## Commands
+
+```sh
+uv sync --locked                       # install pinned dependencies
+uv run ruff format . && uv run ruff check .
+uv run mypy src                        # strict
+uv run lint-imports                    # architecture boundaries
+uv run pytest --cov                    # tests + golden scenarios, >= 80% overall
+uv run coverage report --fail-under=100 --include='src/decision_engine/core/*,src/decision_engine/state_logic/*'
+uv run decision-engine evaluate facts.json   # or: batch, golden golden/
+```
+
+CI (`.github/workflows/ci.yml`) runs all of these plus `pip-audit`. Never weaken a gate to make a change pass.
+
+## Decided
+
+| Item | Decision |
+|---|---|
+| Layout | `src/decision_engine/`: `core/` (pure), `state_logic/` (pure), `rules_loader.py`, `golden.py`, `cli.py`; rule data in `src/decision_engine/rules_data/`; golden scenarios in `golden/*.yaml` |
+| Tooling | Python 3.13, uv with hash-pinned `uv.lock`, pytest + hypothesis, ruff (`ALL`), mypy `--strict`, import-linter, pip-audit |
+| Coverage | 100% branch for `core/` and `state_logic/`; >= 80% overall |
+| Rule format | Hybrid: cited YAML data validated by `RuleSetData` + pure Python logic per (state, version) |
+| CI | GitHub Actions, actions pinned by SHA; `checks` and `dependency-audit` are required to merge |
+
 ## Undecided workflow items
 
 | Item | Status |
 |---|---|
-| Directory layout / package name | TO BE DECIDED |
-| Python version, dependency manager, lockfile | TO BE DECIDED |
-| Build / run / test / lint / format / type-check commands | TO BE DECIDED |
-| Test framework; golden-scenario file format and location | TO BE DECIDED |
-| Rule data format (code vs. data files); rule-set hash method | TO BE DECIDED |
 | Persistence library and migrations tool | TO BE DECIDED |
-| CI platform and required checks | UNKNOWN |
 | Required reviewers; how attorney sign-off is recorded | TO BE DECIDED |
 | Rule and package versioning / release process | TO BE DECIDED |

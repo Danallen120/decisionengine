@@ -87,7 +87,7 @@ Sections 6401 and 6402 set intestate shares: community property to the spouse, a
 ## Facts the engine will need
 
 **In the schema** (REQ-CORE-004):
-- Account type: sole, joint, POD, Totten trust.
+- Account type: sole, joint with survivorship (California's default, § 5302(a)), POD, Totten trust. A joint account without survivorship falls under § 5302(d) and is not determinable on Path A.
 - Holders by role (co-owner, POD payee, Totten beneficiary), with survivorship and any terms shares.
 - Whether the terms require multiple signatures.
 - Whether a restraining order or a written withdrawal notice has been received.

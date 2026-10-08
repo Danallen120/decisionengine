@@ -9,6 +9,7 @@ import pytest
 from decision_engine.core import (
     Determination,
     Facts,
+    InstitutionPolicy,
     Jurisdiction,
     LiabilityProtection,
     NotDeterminable,
@@ -19,10 +20,23 @@ from decision_engine.core import (
     RuleRegistry,
     RuleSet,
     RuleSetData,
+    SharesPayment,
 )
 from decision_engine.core.decision import RuleResult
 
 TEST_CITATION = "Test Code § 1"
+
+
+def account_payload(**overrides: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "account_type": "sole",
+        "balance": "12500.00",
+        "requires_multiple_signatures": False,
+        "restraining_order_served": False,
+        "withdrawal_notice_received": False,
+    }
+    payload.update(overrides)
+    return payload
 
 
 def facts_payload(**overrides: Any) -> dict[str, Any]:
@@ -30,7 +44,7 @@ def facts_payload(**overrides: Any) -> dict[str, Any]:
         "jurisdiction": "CA",
         "date_of_death": "2026-01-15",
         "as_of_date": "2026-03-01",
-        "account": {"ownership": "sole", "balance": "12500.00"},
+        "account": account_payload(),
         "probate_opened": False,
         "parties": [
             {"party_id": "P1", "relationship": "surviving_spouse"},
@@ -57,7 +71,7 @@ def split_evenly(facts: Facts, data: RuleSetData) -> RuleResult:
         for p, s in zip(facts.parties, shares, strict=True)
     )
     return Determination(
-        payees=payees,
+        payment=SharesPayment(payees=payees),
         required_documents=(
             RequiredDocument(code="DEATH_CERTIFICATE", citations=(TEST_CITATION,)),
         ),
@@ -79,6 +93,19 @@ def rule_data(
         effective_through=effective_through,
         parameters=(),
     )
+
+
+def make_policy(**overrides: Any) -> InstitutionPolicy:
+    payload: dict[str, Any] = {
+        "institution": "test-bank",
+        "version": "1.0.0",
+        "description": "Test-only policy that adds nothing unless overridden.",
+    }
+    payload.update(overrides)
+    return InstitutionPolicy.model_validate_json(json.dumps(payload))
+
+
+BASELINE = make_policy(institution="baseline")
 
 
 @pytest.fixture

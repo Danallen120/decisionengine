@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from decision_engine.core import Facts
 
-from .conftest import facts_payload, make_facts
+from .conftest import account_payload, facts_payload, make_facts
 
 PII_FIELD_PATTERN = re.compile(
     r"name|ssn|tin|tax|social|account_?(number|no|num)|routing|address|street|zip|postal|"
@@ -25,7 +25,7 @@ def _parse(payload):
 
 def test_valid_facts_parse_and_are_frozen():
     facts = make_facts()
-    assert facts.schema_version == "1"
+    assert facts.schema_version == "2"
     with pytest.raises(ValidationError):
         facts.probate_opened = True  # type: ignore[misc]
 
@@ -38,7 +38,7 @@ def test_unknown_fields_are_rejected(field):
 
 
 def test_unknown_nested_field_is_rejected():
-    payload = facts_payload(account={"ownership": "sole", "balance": "1.00", "number": "123"})
+    payload = facts_payload(account=account_payload(number="123"))
     with pytest.raises(ValidationError):
         _parse(payload)
 
@@ -46,7 +46,7 @@ def test_unknown_nested_field_is_rejected():
 @pytest.mark.parametrize("balance", [12500.0, 12500, "12500.001", "-5.00"])
 def test_money_must_be_a_two_place_decimal_string(balance):
     with pytest.raises(ValidationError):
-        _parse(facts_payload(account={"ownership": "sole", "balance": balance}))
+        _parse(facts_payload(account=account_payload(balance=balance)))
 
 
 @pytest.mark.parametrize("value", ["true", 1, "yes"])

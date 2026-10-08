@@ -13,9 +13,14 @@ from typing import BinaryIO, Final, TextIO
 
 from pydantic import ValidationError
 
-from decision_engine.core import Facts, RuleRegistry, canonical_json, evaluate
+from decision_engine.core import Facts, InstitutionPolicy, RuleRegistry, canonical_json, evaluate
 from decision_engine.golden import load_scenarios, render_markdown
-from decision_engine.rules_loader import default_registry
+from decision_engine.rules_loader import (
+    RuleLoadError,
+    default_policy,
+    default_registry,
+    load_policy,
+)
 
 MAX_INPUT_BYTES: Final = 10 * 1024 * 1024
 MAX_BATCH_ITEMS: Final = 1000
@@ -37,11 +42,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "golden":
             sys.stdout.write(render_markdown(load_scenarios(args.directory)))
             return EXIT_OK
+        policy = _load_policy(args.policy)
         raw = _read_capped(args.input)
         rules = default_registry()
         if args.command == "evaluate":
-            return _evaluate_one(raw, rules, sys.stdout, sys.stderr)
-        return _evaluate_batch(raw, rules, sys.stdout)
+            return _evaluate_one(raw, rules, policy, sys.stdout, sys.stderr)
+        return _evaluate_batch(raw, rules, policy, sys.stdout)
     except InputError as error:
         _write_json(sys.stderr, {"error": str(error)})
         return EXIT_INVALID_INPUT
@@ -56,9 +62,32 @@ def _parser() -> argparse.ArgumentParser:
     ):
         command = commands.add_parser(name, help=help_text)
         command.add_argument("input", help="JSON file path, or - for stdin")
+        command.add_argument(
+            "--policy",
+            type=Path,
+            help="institution policy YAML (default: the statutory baseline)",
+        )
     golden = commands.add_parser("golden", help="render golden scenarios for attorney review")
     golden.add_argument("directory", type=Path, help="directory of golden scenario YAML files")
     return parser
+
+
+def _load_policy(path: Path | None) -> InstitutionPolicy:
+    if path is None:
+        return default_policy()
+    try:
+        return load_policy(path)
+    except ValidationError as error:
+        details = error.errors(include_url=False, include_input=False, include_context=False)
+        fields = ", ".join(
+            ".".join(str(part)[:MAX_LOC_PART_CHARS] for part in e["loc"]) or "(root)"
+            for e in details
+        )
+        msg = f"policy file is invalid at: {fields}"
+        raise InputError(msg) from error
+    except (OSError, RuleLoadError) as error:
+        msg = "policy file could not be read"
+        raise InputError(msg) from error
 
 
 def _read_capped(source: str) -> bytes:
@@ -76,17 +105,28 @@ def _read_stream(stream: BinaryIO) -> bytes:
     return raw
 
 
-def _evaluate_one(raw: bytes, rules: RuleRegistry, out: TextIO, err: TextIO) -> int:
+def _evaluate_one(
+    raw: bytes,
+    rules: RuleRegistry,
+    policy: InstitutionPolicy,
+    out: TextIO,
+    err: TextIO,
+) -> int:
     try:
         facts = Facts.model_validate_json(raw)
     except ValidationError as error:
         _write_json(err, {"errors": _safe_errors(error)})
         return EXIT_INVALID_INPUT
-    out.write(canonical_json(evaluate(facts, rules)) + "\n")
+    out.write(canonical_json(evaluate(facts, rules, policy)) + "\n")
     return EXIT_OK
 
 
-def _evaluate_batch(raw: bytes, rules: RuleRegistry, out: TextIO) -> int:
+def _evaluate_batch(
+    raw: bytes,
+    rules: RuleRegistry,
+    policy: InstitutionPolicy,
+    out: TextIO,
+) -> int:
     try:
         items = json.loads(raw)
     except (json.JSONDecodeError, UnicodeDecodeError) as error:
@@ -105,7 +145,7 @@ def _evaluate_batch(raw: bytes, rules: RuleRegistry, out: TextIO) -> int:
         except ValidationError as error:
             results.append({"index": index, "errors": _safe_errors(error)})
             continue
-        decision = evaluate(facts, rules).model_dump(mode="json")
+        decision = evaluate(facts, rules, policy).model_dump(mode="json")
         results.append({"index": index, "decision": decision})
     out.write(canonical_json(results) + "\n")
     has_errors = any("errors" in result for result in results)

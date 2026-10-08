@@ -86,3 +86,9 @@ SemVer = Annotated[
     StringConstraints(pattern=r"^(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})$"),
 ]
 """Semantic version ``MAJOR.MINOR.PATCH``."""
+
+InstitutionId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9-]{1,62}$")]
+"""Institution identifier for a policy, e.g. ``"baseline"``. Lowercase letters, digits, hyphens."""
+
+PlainEnglish = Annotated[str, StringConstraints(min_length=10, max_length=500)]
+"""A plain-English explanation written for attorney review."""

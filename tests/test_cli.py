@@ -35,7 +35,9 @@ def test_evaluate_reads_stdin(monkeypatch, capsys):
     stdin = json.dumps(facts_payload()).encode()
     code, out, _ = _run(monkeypatch, capsys, ["evaluate", "-"], stdin)
     assert code == cli.EXIT_OK
-    assert json.loads(out)["schema_version"] == "1"
+    decision = json.loads(out)
+    assert decision["schema_version"] == "2"
+    assert decision["policy"]["institution"] == "baseline"
 
 
 def test_invalid_input_reports_paths_not_values(monkeypatch, capsys):
@@ -100,3 +102,41 @@ def test_golden_renders_markdown(monkeypatch, capsys):
     assert code == cli.EXIT_OK
     assert out.startswith("| ID |")
     assert "GS-GEN-001" in out
+
+
+def test_custom_policy_is_applied_and_recorded(monkeypatch, capsys, tmp_path):
+    policy = tmp_path / "bank.yaml"
+    policy.write_text(
+        "institution: example-bank\n"
+        "version: 1.0.0\n"
+        "description: Example institution policy used only in tests.\n"
+        "declined_account_types: [sole]\n",
+    )
+    stdin = json.dumps(facts_payload(jurisdiction="TX")).encode()
+    code, out, _ = _run(monkeypatch, capsys, ["evaluate", "-", "--policy", str(policy)], stdin)
+    assert code == cli.EXIT_OK
+    assert json.loads(out)["policy"]["institution"] == "example-bank"
+
+
+def test_invalid_policy_file_fails_cleanly_without_values(monkeypatch, capsys, tmp_path):
+    policy = tmp_path / "bad.yaml"
+    policy.write_text(
+        "institution: example-bank\n"
+        "version: 1.0.0\n"
+        "description: Example institution policy used only in tests.\n"
+        f"waive_waiting_period: '{SSN_LIKE_VALUE}'\n",
+    )
+    stdin = json.dumps(facts_payload()).encode()
+    code, out, err = _run(monkeypatch, capsys, ["batch", "-", "--policy", str(policy)], stdin)
+    assert code == cli.EXIT_INVALID_INPUT
+    assert out == ""
+    assert SSN_LIKE_VALUE not in err
+    assert "waive_waiting_period" in json.loads(err)["error"]
+
+
+def test_missing_policy_file_fails_cleanly(monkeypatch, capsys, tmp_path):
+    stdin = json.dumps(facts_payload()).encode()
+    argv = ["evaluate", "-", "--policy", str(tmp_path / "missing.yaml")]
+    code, _, err = _run(monkeypatch, capsys, argv, stdin)
+    assert code == cli.EXIT_INVALID_INPUT
+    assert "could not be read" in json.loads(err)["error"]

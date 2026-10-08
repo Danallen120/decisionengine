@@ -2,8 +2,9 @@
 
 A scenario file is YAML with a list of scenarios. Each scenario has a stable
 ``id``, a plain-English ``title``, ``facts``, and an ``expected`` decision
-without hash fields. Hashes change whenever any rule data changes, so they are
-compared by the rule-set version instead.
+without hash or policy fields. Hashes change whenever any rule data changes, so
+rule sets are compared by version instead. Scenarios specify the law, so they
+always run against the statutory baseline policy and the policy is not compared.
 """
 
 import json
@@ -12,12 +13,17 @@ from typing import Annotated, Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter
 
-from decision_engine.core import Decision, Facts, RuleRegistry, evaluate
+from decision_engine.core import Decision, Facts, InstitutionPolicy, RuleRegistry, evaluate
 from decision_engine.rules_loader import load_yaml_as_json
 
 SCENARIO_GLOB: Final = "*.yaml"
 _PLACEHOLDER_HASH: Final = "0" * 64
-_HASH_FIELDS: Final = ("registry_hash",)
+_UNCOMPARED_FIELDS: Final = ("registry_hash", "policy")
+_PLACEHOLDER_POLICY: Final = {
+    "institution": "baseline",
+    "version": "0.0.0",
+    "content_hash": "0" * 64,
+}
 
 ScenarioId = Annotated[str, StringConstraints(pattern=r"^GS-[A-Z]{2,7}-[0-9]{3}$")]
 
@@ -38,6 +44,7 @@ class Scenario(BaseModel):
         """Validate ``expected`` as a full decision and return its hash-free form."""
         candidate = dict(self.expected)
         candidate["registry_hash"] = _PLACEHOLDER_HASH
+        candidate["policy"] = _PLACEHOLDER_POLICY
         if isinstance(candidate.get("rule_set"), dict):
             candidate["rule_set"] = {**candidate["rule_set"], "content_hash": _PLACEHOLDER_HASH}
         decision = Decision.model_validate_json(json.dumps(candidate))
@@ -48,9 +55,9 @@ _SCENARIO_LIST = TypeAdapter(list[Scenario])
 
 
 def comparable(decision: Decision) -> dict[str, Any]:
-    """Decision as JSON-mode data with hash fields removed."""
+    """Decision as JSON-mode data without hashes or the policy reference."""
     data = decision.model_dump(mode="json")
-    for name in _HASH_FIELDS:
+    for name in _UNCOMPARED_FIELDS:
         data.pop(name)
     if data["rule_set"] is not None:
         data["rule_set"].pop("content_hash")
@@ -70,9 +77,13 @@ def load_scenarios(directory: Path) -> list[Scenario]:
     return scenarios
 
 
-def run_scenario(scenario: Scenario, rules: RuleRegistry) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Return ``(expected, actual)`` in comparable form."""
-    return scenario.expected_comparable(), comparable(evaluate(scenario.facts, rules))
+def run_scenario(
+    scenario: Scenario,
+    rules: RuleRegistry,
+    baseline: InstitutionPolicy,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return ``(expected, actual)`` in comparable form, evaluated under ``baseline``."""
+    return scenario.expected_comparable(), comparable(evaluate(scenario.facts, rules, baseline))
 
 
 def render_markdown(scenarios: list[Scenario]) -> str:
@@ -94,16 +105,32 @@ def _describe_facts(facts: Facts) -> str:
     probate = "probate opened" if facts.probate_opened else "no probate"
     return (
         f"{facts.jurisdiction.value}; died {facts.date_of_death.isoformat()}; "
-        f"evaluated {facts.as_of_date.isoformat()}; {facts.account.ownership.value} account "
-        f"${facts.account.balance}; {probate}; parties: {parties}"
+        f"evaluated {facts.as_of_date.isoformat()}; {facts.account.account_type.value} account "
+        f"${facts.account.balance}{_describe_holders(facts)}; {probate}; parties: {parties}"
     )
+
+
+def _describe_holders(facts: Facts) -> str:
+    holders = [
+        f"{h.party_id} {h.role.value}{'' if h.survived_decedent else ' (predeceased)'}"
+        + (
+            f" {h.terms_share.numerator}/{h.terms_share.denominator} by terms"
+            if h.terms_share is not None
+            else ""
+        )
+        for h in facts.account.holders
+    ]
+    return f" ({', '.join(holders)})" if holders else ""
 
 
 def _describe_outcome(scenario: Scenario) -> str:
     expected = scenario.expected_comparable()
     if expected["determination"] is None:
         return f"Not determinable ({', '.join(expected['reasons'])})"
-    payees = ", ".join(f"{p['party_id']} {p['share']}" for p in expected["determination"]["payees"])
+    payment = expected["determination"]["payment"]
+    if payment["form"] == "any_of":
+        return f"Payable to any of {', '.join(payment['party_ids'])}"
+    payees = ", ".join(f"{p['party_id']} {p['share']}" for p in payment["payees"])
     return f"Pay {payees}"
 
 
@@ -111,8 +138,9 @@ def _describe_citations(scenario: Scenario) -> str:
     determination = scenario.expected_comparable()["determination"]
     if determination is None:
         return "—"
-    found: set[str] = set()
-    for payee in determination["payees"]:
+    payment = determination["payment"]
+    found: set[str] = set(payment.get("citations", []))
+    for payee in payment.get("payees", []):
         found.update(payee["citations"])
     for document in determination["required_documents"]:
         found.update(document["citations"])

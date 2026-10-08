@@ -2,40 +2,54 @@
 
 from decision_engine.core.canonical import canonical_json
 from decision_engine.core.decision import (
+    AnyOfPayment,
     Decision,
     Determination,
+    DocumentSource,
     LiabilityProtection,
     NotDeterminable,
     Outcome,
     Payee,
+    PolicyRef,
     ReasonCode,
     ReleaseDate,
     RequiredDocument,
     RuleSetRef,
+    SharesPayment,
 )
 from decision_engine.core.engine import evaluate
 from decision_engine.core.facts import (
     Account,
+    AccountHolder,
+    AccountType,
     Facts,
+    HolderRole,
     Jurisdiction,
-    OwnershipType,
     Party,
     Relationship,
 )
+from decision_engine.core.policy import InstitutionPolicy, PolicyDocument
 from decision_engine.core.rules import RuleRegistry, RuleRegistryError, RuleSet, RuleSetData
 
 __all__ = [
     "Account",
+    "AccountHolder",
+    "AccountType",
+    "AnyOfPayment",
     "Decision",
     "Determination",
+    "DocumentSource",
     "Facts",
+    "HolderRole",
+    "InstitutionPolicy",
     "Jurisdiction",
     "LiabilityProtection",
     "NotDeterminable",
     "Outcome",
-    "OwnershipType",
     "Party",
     "Payee",
+    "PolicyDocument",
+    "PolicyRef",
     "ReasonCode",
     "Relationship",
     "ReleaseDate",
@@ -45,6 +59,7 @@ __all__ = [
     "RuleSet",
     "RuleSetData",
     "RuleSetRef",
+    "SharesPayment",
     "canonical_json",
     "evaluate",
 ]

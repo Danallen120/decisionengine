@@ -6,7 +6,7 @@ Owns: how to work in this repo. System design is in `ARCHITECTURE.md` (imported 
 
 ## Status
 
-Foundation built: schemas, engine, rule loading, golden runner, CLI, and CI. No state rules exist yet, so every decision is `not_determinable`. If a task depends on an undecided item (see the table below or the ARCHITECTURE.md open questions), ask instead of picking.
+Foundation built: schemas (with account terms), engine, institution policy, rule loading, golden runner, CLI, and CI. No state rules exist yet, so every decision is `not_determinable`. The California spec (`docs/rules/CA/`) awaits attorney review. If a task depends on an undecided item (see the table below or the ARCHITECTURE.md open questions), ask instead of picking.
 
 ## Legal-rule guardrails
 
@@ -30,7 +30,7 @@ uv run mypy src                        # strict
 uv run lint-imports                    # architecture boundaries
 uv run pytest --cov                    # tests + golden scenarios, >= 80% overall
 uv run coverage report --fail-under=100 --include='src/decision_engine/core/*,src/decision_engine/state_logic/*'
-uv run decision-engine evaluate facts.json   # or: batch, golden golden/
+uv run decision-engine evaluate facts.json [--policy bank.yaml]   # or: batch, golden golden/
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of these plus `pip-audit`. Never weaken a gate to make a change pass.
@@ -43,6 +43,7 @@ CI (`.github/workflows/ci.yml`) runs all of these plus `pip-audit`. Never weaken
 | Tooling | Python 3.13, uv with hash-pinned `uv.lock`, pytest + hypothesis, ruff (`ALL`), mypy `--strict`, import-linter, pip-audit |
 | Coverage | 100% branch for `core/` and `state_logic/`; >= 80% overall |
 | Rule format | Hybrid: cited YAML data validated by `RuleSetData` + pure Python logic per (state, version) |
+| Institution policy | Stricter-only YAML per institution (`src/decision_engine/policies/`), recorded on every decision; `baseline` adds nothing |
 | CI | GitHub Actions, actions pinned by SHA; `checks` and `dependency-audit` are required to merge |
 
 ## Undecided workflow items

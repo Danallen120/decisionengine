@@ -20,7 +20,7 @@ Owns: system shape, contracts, and open design questions. Security controls live
 
 ### Layers (dependencies point inward only)
 
-1. **Core engine**: `evaluate(facts, rules) -> Decision`. It is pure and deterministic: no I/O, clock, randomness, network, or DB, and it imports only the standard library and Pydantic. Same facts + same rule set always give an identical decision. Rules are loaded by an outer layer and passed in.
+1. **Core engine**: `evaluate(facts, rules, policy) -> Decision`. It is pure and deterministic: no I/O, clock, randomness, network, or DB, and it imports only the standard library and Pydantic. Same facts + same rule set + same policy always give an identical decision. Rules and policy are loaded by an outer layer and passed in.
 2. **Rules**: per-state rule sets, versioned in git. Each is cited YAML data plus pure Python logic (`state_logic`). The engine selects exactly one by jurisdiction + date of death; ranges may not overlap.
 3. **CLI**: runs single, batch, and golden-suite evaluations. This is the v1 delivery path.
 4. **API**: FastAPI `/v1` with single and batch endpoints. This is the only layer with auth or PostgreSQL.
@@ -28,10 +28,11 @@ Owns: system shape, contracts, and open design questions. Security controls live
 
 ### Contracts
 
-- **Facts**: account and decedent facts, including jurisdiction and date of death. Every date the engine uses (including the as-of date) is a fact, never read from the clock.
-- **Decision**: outcome `determined` or `not_determinable`. A determined decision has payees and exact fractional shares summing to 1, required documents, earliest release date, and liability-protection applicability, each with statute citations. Every decision records the registry hash, and the rule set (version + hash) when one was selected.
+- **Facts**: account and decedent facts, including jurisdiction and date of death. Every date the engine uses (including the as-of date) is a fact, never read from the clock. Account terms are facts too: account type (sole, joint, POD, Totten trust), other holders by role with survivorship and any terms shares, signature requirements, and payment-blocking events.
+- **Decision**: outcome `determined` or `not_determinable`. A determined decision has a payment, either exact fractional shares summing to 1 or "any of" these parties per the account terms. It also has required documents (from statute, with citations, or from policy), the earliest release date (including any policy days), and liability-protection applicability. Every decision records the registry hash and the policy reference, plus the rule set (version + hash) when one was selected.
+- **Institution policy**: a versioned, hashed file per institution for choices the statutes leave to the institution. It can only make decisions stricter (extra waiting days, extra documents, declining account types or balances above a limit); no field can relax a statutory condition. A packaged `baseline` policy adds nothing, and golden scenarios run against it.
 - **Rule-set hash**: SHA-256 of the canonical JSON of the validated rule data. It covers data only, so any logic change must bump the version.
-- **Decision log row** (API layer, append-only): facts hash, rule version, rule-set hash, output, timestamp, API key ID. Raw facts are never stored.
+- **Decision log row** (API layer, append-only): facts hash, rule version, rule-set hash, policy reference, output, timestamp, API key ID. Raw facts are never stored.
 - **API key**: stored hashed, revocable.
 
 ### Attorney-facing artifacts
@@ -46,6 +47,8 @@ For each state: a rule spec, an open-questions list, and a golden-scenario table
 ### Decisions
 
 - **Unsupported cases** (decided 2026-10-07, REQ-RULES-001): malformed input is a validation error. Valid facts outside rule coverage return `not_determinable` with reason codes, so operations routes them to a person. The engine never falls back to a default rule set.
+
+- **Where answers come from** (decided 2026-10-07): each rule question is answered by law (attorney), account terms (facts), or institution policy (stricter-only). See `docs/rules/<state>/open-questions.md`.
 
 ### Open questions
 

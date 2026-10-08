@@ -20,12 +20,11 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 from decision_engine.core.canonical import canonical_json
 from decision_engine.core.decision import ReasonCode, RuleResult, RuleSetRef
 from decision_engine.core.facts import Facts, Jurisdiction
-from decision_engine.core.types import Citation, Money, SemVer
+from decision_engine.core.types import Citation, Money, PlainEnglish, SemVer
 
 RULE_DATA_SCHEMA_VERSION: Final = "1"
 
 ParameterName = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{2,63}$")]
-PlainEnglish = Annotated[str, StringConstraints(min_length=10, max_length=500)]
 
 
 class _StrictModel(BaseModel):

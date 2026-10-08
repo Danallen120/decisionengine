@@ -1,0 +1,6 @@
+# Statutory baseline: adds nothing beyond the law. Golden scenarios run against it.
+# Institutions supply their own policy; it may only add waiting days, add
+# documents, or decline cases (see decision_engine/core/policy.py).
+institution: baseline
+version: 1.0.0
+description: Statutory baseline with no institution-specific additions.

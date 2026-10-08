@@ -1,4 +1,4 @@
-"""Load rule data from disk and pair it with rule logic (the I/O edge for rules).
+"""Load rule data and institution policies from disk (the I/O edge for rules and policy).
 
 YAML is parsed with a safe loader that keeps dates as strings, then validated in
 pydantic's JSON mode, so YAML and JSON inputs follow exactly the same strict rules
@@ -13,12 +13,19 @@ from typing import Final
 
 import yaml
 
-from decision_engine.core import Jurisdiction, RuleRegistry, RuleSet, RuleSetData
+from decision_engine.core import (
+    InstitutionPolicy,
+    Jurisdiction,
+    RuleRegistry,
+    RuleSet,
+    RuleSetData,
+)
 from decision_engine.core.rules import RuleLogic
 from decision_engine.state_logic import LOGIC
 
 MAX_RULE_FILE_BYTES: Final = 1_000_000
 RULE_DATA_GLOB: Final = "*.yaml"
+BASELINE_POLICY: Final = "baseline.yaml"
 
 LogicTable = Mapping[tuple[Jurisdiction, str], RuleLogic]
 
@@ -78,3 +85,13 @@ def default_registry() -> RuleRegistry:
     """Load the rule sets shipped with this package."""
     data_dir = Path(str(files("decision_engine") / "rules_data"))
     return load_registry(data_dir, LOGIC)
+
+
+def load_policy(path: Path) -> InstitutionPolicy:
+    """Parse and validate one institution policy file."""
+    return InstitutionPolicy.model_validate_json(load_yaml_as_json(path))
+
+
+def default_policy() -> InstitutionPolicy:
+    """The packaged statutory baseline policy, which adds nothing beyond the law."""
+    return load_policy(Path(str(files("decision_engine") / "policies" / BASELINE_POLICY)))

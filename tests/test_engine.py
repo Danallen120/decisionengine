@@ -12,11 +12,11 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from decision_engine.core import (
+    AccountType,
     Decision,
     Facts,
     Jurisdiction,
     Outcome,
-    OwnershipType,
     ReasonCode,
     Relationship,
     RuleRegistry,
@@ -25,7 +25,7 @@ from decision_engine.core import (
     evaluate,
 )
 
-from .conftest import make_facts, rule_data, split_evenly
+from .conftest import BASELINE, make_facts, rule_data, split_evenly
 
 PURE_PACKAGES = [
     Path(__file__).parents[1] / "src" / "decision_engine" / "core",
@@ -52,7 +52,7 @@ FORBIDDEN_CALLS = {"now", "today", "utcnow", "time", "monotonic", "perf_counter"
 
 
 def test_covered_facts_are_determined(registry):
-    decision = evaluate(make_facts(), registry)
+    decision = evaluate(make_facts(), registry, BASELINE)
     assert decision.outcome is Outcome.DETERMINED
     assert decision.rule_set is not None
     assert decision.rule_set.version == "0.0.1"
@@ -60,7 +60,7 @@ def test_covered_facts_are_determined(registry):
 
 
 def test_unsupported_jurisdiction_is_not_determinable(registry):
-    decision = evaluate(make_facts(jurisdiction="TX"), registry)
+    decision = evaluate(make_facts(jurisdiction="TX"), registry, BASELINE)
     assert decision.outcome is Outcome.NOT_DETERMINABLE
     assert decision.reasons == (ReasonCode.UNSUPPORTED_JURISDICTION,)
     assert decision.determination is None
@@ -68,12 +68,12 @@ def test_unsupported_jurisdiction_is_not_determinable(registry):
 
 
 def test_death_before_any_rule_set_is_not_determinable(registry):
-    decision = evaluate(make_facts(date_of_death="2025-12-31"), registry)
+    decision = evaluate(make_facts(date_of_death="2025-12-31"), registry, BASELINE)
     assert decision.reasons == (ReasonCode.NO_RULE_SET_FOR_DATE_OF_DEATH,)
 
 
 def test_rule_logic_can_decline_and_the_rule_set_is_still_recorded(registry):
-    decision = evaluate(make_facts(parties=[]), registry)
+    decision = evaluate(make_facts(parties=[]), registry, BASELINE)
     assert decision.reasons == (ReasonCode.FACT_PATTERN_NOT_COVERED,)
     assert decision.rule_set is not None
 
@@ -83,17 +83,19 @@ def test_rule_logic_can_decline_and_the_rule_set_is_still_recorded(registry):
 
 def test_repeated_evaluation_is_byte_identical(registry):
     facts = make_facts()
-    assert canonical_json(evaluate(facts, registry)) == canonical_json(evaluate(facts, registry))
+    assert canonical_json(evaluate(facts, registry, BASELINE)) == canonical_json(
+        evaluate(facts, registry, BASELINE)
+    )
 
 
 def test_evaluation_is_identical_across_processes_and_hash_seeds():
     script = (
         "import json, sys\n"
         "sys.path.insert(0, 'tests')\n"
-        "from conftest import make_facts, split_evenly, rule_data\n"
+        "from conftest import BASELINE, make_facts, split_evenly, rule_data\n"
         "from decision_engine.core import RuleRegistry, RuleSet, canonical_json, evaluate\n"
         "registry = RuleRegistry([RuleSet(data=rule_data(), logic=split_evenly)])\n"
-        "print(canonical_json(evaluate(make_facts(), registry)))\n"
+        "print(canonical_json(evaluate(make_facts(), registry, BASELINE)))\n"
     )
     root = Path(__file__).parents[1]
     outputs = set()
@@ -158,23 +160,46 @@ _dates = st.dates(min_value=date(1900, 1, 1), max_value=date(2100, 12, 31))
 _REGISTRY = RuleRegistry([RuleSet(data=rule_data(), logic=split_evenly)])
 
 
+_REQUIRED_ROLE = {
+    AccountType.JOINT: "co_owner",
+    AccountType.PAYABLE_ON_DEATH: "pod_payee",
+    AccountType.TOTTEN_TRUST: "totten_beneficiary",
+}
+
+
 @st.composite
 def facts_strategy(draw):
     date_of_death = draw(_dates)
     as_of = date_of_death + timedelta(days=draw(st.integers(min_value=0, max_value=3650)))
-    count = draw(st.integers(min_value=0, max_value=6))
+    account_type = draw(st.sampled_from(list(AccountType)))
+    minimum = 0 if account_type is AccountType.SOLE else 1
+    count = draw(st.integers(min_value=minimum, max_value=6))
     parties = [
         {"party_id": f"P{i}", "relationship": draw(st.sampled_from(list(Relationship))).value}
         for i in range(1, count + 1)
     ]
+    holders = []
+    if account_type is not AccountType.SOLE:
+        holders = [
+            {
+                "party_id": party["party_id"],
+                "role": _REQUIRED_ROLE[account_type],
+                "survived_decedent": draw(st.booleans()),
+            }
+            for party in parties[: draw(st.integers(min_value=1, max_value=count))]
+        ]
     cents = draw(st.integers(min_value=0, max_value=10**12))
     payload = {
         "jurisdiction": draw(st.sampled_from(list(Jurisdiction))).value,
         "date_of_death": date_of_death.isoformat(),
         "as_of_date": as_of.isoformat(),
         "account": {
-            "ownership": draw(st.sampled_from(list(OwnershipType))).value,
+            "account_type": account_type.value,
             "balance": f"{cents // 100}.{cents % 100:02d}",
+            "holders": holders,
+            "requires_multiple_signatures": draw(st.booleans()),
+            "restraining_order_served": draw(st.booleans()),
+            "withdrawal_notice_received": draw(st.booleans()),
         },
         "probate_opened": draw(st.booleans()),
         "parties": parties,
@@ -184,6 +209,6 @@ def facts_strategy(draw):
 
 @given(facts=facts_strategy())
 def test_any_valid_facts_yield_a_valid_decision(facts):
-    text = canonical_json(evaluate(facts, _REGISTRY))
+    text = canonical_json(evaluate(facts, _REGISTRY, BASELINE))
     assert canonical_json(Decision.model_validate_json(text)) == text
-    assert text == canonical_json(evaluate(facts, _REGISTRY))
+    assert text == canonical_json(evaluate(facts, _REGISTRY, BASELINE))

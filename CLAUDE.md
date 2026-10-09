@@ -13,6 +13,7 @@ Foundation built: schemas (with account terms), engine, institution policy, rule
 - **Never invent law.** Every rule must cite a real, verifiable statute. If the law or a citation is uncertain, add an open-questions entry for that state and do not encode a guess.
 - **Golden scenarios are the spec.** Every rule change ships with its citation and matching golden-scenario updates in the same PR. Never change an expected decision just to make a test pass. If the test looks wrong, raise it for attorney review.
 - **Write for attorneys.** Rule specs, open questions, and golden-scenario tables must be plain English and readable without the code. After editing `docs/rules/<STATE>/*.md`, regenerate the Word review copy with `scripts/build-review-docs.sh` (requires pandoc). The Markdown is the source of truth.
+- **Research before rules.** Run the `estate-law-reviewer` agent (`.claude/agents/estate-law-reviewer.md`) on new or changed rule specs. Spot-check its citations, and save its report as `docs/rules/<STATE>/legal-review.md`. Its output is research only; attorney approval is still required.
 - **Don't widen v1 scope.** No new jurisdictions, UI, or deployment work unless a requirement asks for it.
 
 ## Workflow

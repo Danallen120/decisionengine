@@ -57,7 +57,27 @@ COVER
   echo "wrote docs/rules/$state/$state-attorney-review.docx"
 }
 
+# Legal research reviews: landscape (wide tables). The first "# " heading becomes the title.
+build_research() {
+  local source="$1" title="$2" output="$3" combined="$work/research.md"
+  {
+    printf -- '---\ntitle: "%s"\nsubtitle: "Legal research for attorney verification. Not legal advice."\ndate: "Prepared %s"\n---\n\n' "$title" "$prepared"
+    awk 'BEGIN { skipped = 0 } /^# / && !skipped { skipped = 1; next } { print }' "$root/$source"
+  } > "$combined"
+  pandoc "$combined" --from gfm+yaml_metadata_block --to docx \
+    --reference-doc "$root/scripts/review-reference-landscape.docx" --output "$root/$output"
+  echo "wrote $output"
+}
+
 build CA "California" "Q2, Q3, Q5, Q6, Q8, Q9" \
   "The official California code site blocked automated retrieval, so statute text was read from a public mirror of it. Every citation must be confirmed against leginfo.legislature.ca.gov (question Q9). Dollar limits come from the Judicial Council's official § 890 list."
 build WA "Washington" "W2, W3, W4, W5, W6, W9, W10" \
   "All statute text was read from the official Revised Code of Washington at app.leg.wa.gov."
+
+for review in \
+  "docs/rules/CA/legal-review.md|California Legal Research Review|docs/rules/CA/CA-legal-research-review.docx" \
+  "docs/rules/WA/legal-review.md|Washington Legal Research Review|docs/rules/WA/WA-legal-research-review.docx" \
+  "docs/rules/legal-risk-review.md|Legal Risk and Edge-Case Review|docs/rules/legal-risk-review.docx"; do
+  IFS='|' read -r source title output <<< "$review"
+  if [ -f "$root/$source" ]; then build_research "$source" "$title" "$output"; fi
+done

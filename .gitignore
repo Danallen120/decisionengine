@@ -36,3 +36,6 @@ requirements-audit.txt
 src/decision_engine/api/static/
 frontend/node_modules/
 frontend/coverage/
+
+# Word/Office lock files
+~$*
